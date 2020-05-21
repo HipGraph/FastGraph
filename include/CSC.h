@@ -118,7 +118,7 @@ void CSC<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
                 // k points to last updated entry
                 for(size_t j=1; j<nnzCol; ++j)
                 {
-                    if(tosort[j].first != nzVals_[k])
+                    if(tosort[j].first != rowIds_[k])
                     {
                         rowIds_[++k] = tosort[j].first;
                         nzVals_[k] = tosort[j].second;
