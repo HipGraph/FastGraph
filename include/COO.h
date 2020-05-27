@@ -32,9 +32,10 @@ class COO
 {
 public:
     COO(): nrows_(0), ncols_(0), nnz_(0), sortType_(UNSORTED) {}
-    //COO(RIT nrows, CIT ncols, int64_t nnz, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), sortType_(UNSORTED), isWeighted_(isWeighted) {NzList.resize(nnz_);}
-    
-    
+    COO(RIT nrows, CIT ncols, size_t nnz, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), sortType_(UNSORTED), isWeighted_(isWeighted) {
+        nzRows_.resize(nnz); nzCols_.resize(nnz); nzVals_.resize(nnz);} // uncommented by abhishek
+
+
     //------------------------------------------------
     // Accessor methods for indices and values
     // TODO: how should we check the validity of the access without sacrifycing the performance
@@ -58,7 +59,7 @@ public:
     RIT & NzRows (size_t i) { return nzRows_[i]; }
     CIT & NzCols (size_t i) { return nzCols_[i]; }
     VT & NzVals (size_t i) { return nzVals_[i]; }
-    
+
     
     void GenER(int scale, int d, bool isWeighted, int64_t kRandSeed = 5102020);
     void GenRMAT(int scale, int d, bool isWeighted, int64_t kRandSeed = 5102020);
@@ -69,6 +70,13 @@ public:
     
     template<typename CPT>
     void BinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinned, pvector<VT>& nzValsBinned);
+
+
+    void nz_rows_pvector(pvector<RIT>* row_pointer) { nzRows_ = std::move((*row_pointer));} // added by abhishek
+    void nz_cols_pvector(pvector<CIT>* column_pointer) {nzCols_ = std::move((*column_pointer));}
+    void nz_vals_pvector(pvector<VT>* value_pointer) {nzVals_ = std::move((* value_pointer));}
+    
+    void print_all(); // added by abhishek
 
     
 private:
@@ -86,6 +94,25 @@ template <typename RIT, typename CIT, typename VT>
 void COO<RIT, CIT, VT>::PrintInfo()
 {
     std::cout << "COO matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl;
+}
+
+template <typename RIT, typename CIT, typename VT>
+void COO<RIT, CIT, VT>::print_all()
+{
+    std::cout << "COO matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl<<"nz_values"<<std::endl;
+    for(size_t i = 0; i < nzVals_.size(); i++){
+        std::cout<<nzVals_[i] << " ";
+    }
+    std::cout<<std::endl<<"row_correspondents"<<std::endl;
+    for(size_t i = 0; i < nzRows_.size(); i++){
+        std::cout<<nzRows_[i] << " ";
+    }
+    std::cout<<std::endl<<"column_correspondents"<<std::endl;
+    for(size_t i = 0; i < nzCols_.size(); i++){
+        std::cout<<nzCols_[i] << " ";
+    }
+    std::cout<<std::endl;
+
 }
 
 template <typename RIT, typename CIT, typename VT>
