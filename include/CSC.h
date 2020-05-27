@@ -172,55 +172,56 @@ void CSC<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
 	{
 		pvector<std::pair<RIT, VT>> tosort;
 #pragma omp for
-		for(size_t i=0; i<ncols_; i++)
-		{
-			size_t nnzCol = colPtr_[i+1]-colPtr_[i];
-			sqNnzPerCol[i] = 0;
-			
-			if(nnzCol>0)
-			{
-				if(tosort.size() < nnzCol) tosort.resize(nnzCol);
-				
-				for(size_t j=0, k=colPtr_[i]; j<nnzCol; ++j, ++k)
-				{
-					tosort[j] = std::make_pair(rowIds_[k], nzVals_[k]);
-				}
-				
-				//TODO: replace with radix or another integer sorting
-				sort(tosort.begin(), tosort.end());
-				
-				size_t k = colPtr_[i];
-				rowIds_[k] = tosort[0].first;
-				nzVals_[k] = tosort[0].second;
-				
-				// k points to last updated entry
-				for(size_t j=1; j<nnzCol; ++j)
-				{
-					if(tosort[j].first != rowIds_[k])     // changed(nzVals to rowIds) here by abhishek
-					{
-						rowIds_[++k] = tosort[j].first;  //corrected: while proceeding to next k, check if present k has value after added as 0, if so remove that last k from rowIds and nzVals : by abhishek
-						nzVals_[k] = tosort[j].second;
-					}
-					else
-					{
-						nzVals_[k] = binop(tosort[j].second, nzVals_[k]);
-					}
-				}
-				sqNnzPerCol[i] = k-colPtr_[i]+1;
-		  
-			}
-		}
-	}
-	
-	
-	// now squeze
-	// need another set of arrays
-	// Think: can we avoid this extra copy with a symbolic step?
-	pvector<CPT>sqColPtr;
-	ParallelPrefixSum(sqNnzPerCol, sqColPtr);
-	nnz_ = sqColPtr[ncols_];
-	pvector<RIT> sqRowIds(nnz_);
-	pvector<VT> sqNzVals(nnz_);
+        for(size_t i=0; i<ncols_; i++)
+        {
+            size_t nnzCol = colPtr_[i+1]-colPtr_[i];
+            sqNnzPerCol[i] = 0;
+            
+            if(nnzCol>0)
+            {
+                if(tosort.size() < nnzCol) tosort.resize(nnzCol);
+                
+                for(size_t j=0, k=colPtr_[i]; j<nnzCol; ++j, ++k)
+                {
+                    tosort[j] = std::make_pair(rowIds_[k], nzVals_[k]);
+                }
+                
+                //TODO: replace with radix or another integer sorting
+                sort(tosort.begin(), tosort.end());
+                
+                size_t k = colPtr_[i];
+                rowIds_[k] = tosort[0].first;
+                nzVals_[k] = tosort[0].second;
+                
+                // k points to last updated entry
+                for(size_t j=1; j<nnzCol; ++j)
+                {
+                    if(tosort[j].first != rowIds_[k])
+                    {
+                        rowIds_[++k] = tosort[j].first;
+                        nzVals_[k] = tosort[j].second;
+                    }
+                    else
+                    {
+                        nzVals_[k] = binop(tosort[j].second, nzVals_[k]);
+                    }
+                }
+                sqNnzPerCol[i] = k-colPtr_[i]+1;
+          
+            }
+        }
+    }
+    
+    
+    // now squeze
+    // need another set of arrays
+    // Think: can we avoid this extra copy with a symbolic step?
+    pvector<CPT>sqColPtr;
+    ParallelPrefixSum(sqNnzPerCol, sqColPtr);
+    nnz_ = sqColPtr[ncols_];
+    pvector<RIT> sqRowIds(nnz_);
+    pvector<VT> sqNzVals(nnz_);
+
 #pragma omp parallel for
 	for(size_t i=0; i<ncols_; i++)
 	{
