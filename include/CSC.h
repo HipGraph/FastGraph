@@ -53,19 +53,41 @@ public:
 	const pvector<RIT>* get_rowIds(); 
 	const pvector<VT>* get_nzVals(); 
 
+	CSC<RIT, VT, CPT>(CSC<RIT, VT, CPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isColSorted_(other.isColSorted_)   // added by abhishek
+	{
+		rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
+		colPtr_ = std::move(other.colPtr_);
+		rowIds_ = std::move(other.rowIds_);
+		nzVals_ = std::move(other.nzVals_);
+	}
+
+	CSC<RIT, VT, CPT>& operator= (CSC<RIT, VT, CPT> && other){ // added by abhishek
+		nrows_ = other.nrows_;
+		ncols_ = other.ncols_;
+		nnz_ = other.nnz_;
+		isWeighted_ = other.isWeighted_;
+		isColSorted_ = other.isColSorted_;
+		rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
+		colPtr_ = std::move(other.colPtr_);
+		rowIds_ = std::move(other.rowIds_);
+		nzVals_ = std::move(other.nzVals_);
+		return *this;
+	}
+
 	size_t get_ncols(); // added by abhishek
 	size_t get_nrows();
 	size_t get_nnz() ;
 
-	void nz_rows_pvector(pvector<RIT>* row_pointer) { rowIds_ = std::move((*row_pointer));} // added by abhishek
-	void cols_pvector(pvector<CPT>* column_pointer) {colPtr_ = std::move((*column_pointer));}
-	void nz_vals_pvector(pvector<VT>* value_pointer) {nzVals_ = std::move((* value_pointer));}
+	void nz_rows_pvector(pvector<RIT>* row_pointer) { rowIds_ = std::move(*(row_pointer));} // added by abhishek
+	void cols_pvector(pvector<CPT>* column_pointer) {colPtr_ = std::move(*(column_pointer));}
+	void nz_vals_pvector(pvector<VT>* value_pointer) {nzVals_ = std::move(*(value_pointer));}
 
-	void sort_inside_column(); // added by abhishek
+	void count_sort(pvector<std::pair<RIT, VT> >& all_elements, size_t expon); // added by abhishek
+	void sort_inside_column();
 
 	void print_all(); // added by abhishek
-	// void sort_COO(); // to sort if there are no duplicates
-	
+
+
 private:
 	size_t nrows_;
 	size_t ncols_;
@@ -119,19 +141,39 @@ size_t CSC<RIT, VT, CPT>:: get_nnz()
 template <typename RIT, typename VT, typename CPT>
 void CSC<RIT, VT, CPT>::print_all()
 {
-	std::cout << "CSC matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl<<"nz_values"<<std::endl;
-	for(size_t i = 0; i < nzVals_.size(); i++){
-		std::cout<<nzVals_[i] << " ";
-	}
-	std::cout<<std::endl<<"row_correspondents"<<std::endl;
-	for(size_t i = 0; i < rowIds_.size(); i++){
-		std::cout<<rowIds_[i] << " ";
-	}
-	std::cout<<std::endl<<"column_pointer_array"<<std::endl;
+	//std::cout << "CSC matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl<<"column_pointer_array"<<std::endl;
+	std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
+	
 	for(size_t i = 0; i < colPtr_.size(); i++){
-		std::cout<<colPtr_[i] << " ";
+		std::cout<<colPtr_[i];
+		if(i != ncols_){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
 	}
-	std::cout<<std::endl;
+	//std::cout<<std::endl;
+	//std::cout<<std::endl<<"row_correspondents"<<std::endl;
+	for(size_t i = 0; i < rowIds_.size(); i++){
+		std::cout<<rowIds_[i];
+		if(i != nnz_-1){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+	//std::cout<<std::endl;
+	//std::cout<<std::endl<<"nz_values"<<std::endl;
+	for(size_t i = 0; i < nzVals_.size(); i++){
+		std::cout<<nzVals_[i];
+		if(i != nnz_-1){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+	
+	//std::cout<<std::endl;
 
 }
 
@@ -240,49 +282,91 @@ void CSC<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
 }
 
 
+template <typename RIT, typename VT, typename CPT> 
+void CSC<RIT, VT, CPT>::count_sort(pvector<std::pair<RIT, VT> >& all_elements, size_t expon)
+{
+
+
+	size_t num_of_elements = all_elements.size();
+
+	pvector<std::pair<RIT, VT> > temp_array(num_of_elements);
+	RIT count[10] = {0};
+	size_t index_for_count;
+
+	for(size_t i = 0; i < num_of_elements; i++){
+		index_for_count = ((all_elements[i].first)/expon)%10;
+		count[index_for_count]++;
+	}
+
+	for(int i = 1; i < 10; i++){
+		count[i] += count[i-1];
+	}
+
+	for(size_t i = num_of_elements-1; i > 0; i--){
+		index_for_count = ((all_elements[i].first)/expon)%10;
+		temp_array[count[index_for_count] -1] = all_elements[i];
+		count[index_for_count]--;
+	}
+
+
+	index_for_count = ((all_elements[0].first)/expon)%10;
+	temp_array[count[index_for_count] -1] = all_elements[0];
+
+	all_elements = std::move(temp_array);
+
+	return;
+}
+
+
 
 
 // here rowIds vector is to be sorted piece by piece given that there are no row repititions in a single column or any zero element in nzVals
 template <typename RIT, typename VT, typename CPT>
 void CSC<RIT, VT, CPT>::sort_inside_column()
 {
-
-#pragma omp parallel
+	if(!isColSorted_)
 	{
-		pvector<std::pair<RIT, VT>> tosort;
-#pragma omp for
-		for(size_t i=0; i<ncols_; i++)
-		{
-			size_t nnzCol = colPtr_[i+1]-colPtr_[i];
-			
-			if(nnzCol>0)
-			{
-				if(tosort.size() < nnzCol) tosort.resize(nnzCol);
-				
-				for(size_t j=0, k=colPtr_[i]; j<nnzCol; ++j, ++k)
+		#pragma omp parallel for
+				for(size_t i=0; i<ncols_; i++)
 				{
-					tosort[j] = std::make_pair(rowIds_[k], nzVals_[k]);
-				}
-				
-				//TODO: replace with radix or another integer sorting
-				sort(tosort.begin(), tosort.end());
-				
-				size_t k = colPtr_[i];
-				rowIds_[k] = tosort[0].first;
-				nzVals_[k] = tosort[0].second;
-				
-				// k points to last updated entry
-				for(size_t j=1; j<nnzCol; ++j)
-				{
-						rowIds_[++k] = tosort[j].first;
-						nzVals_[k] = tosort[j].second;
-				}
-			}
-		}
-	}
+					size_t nnzCol = colPtr_[i+1]-colPtr_[i];
+					
+					pvector<std::pair<RIT, VT>> tosort(nnzCol);
+					RIT max_row = 0;
+					if(nnzCol>0)
+					{
+						//if(tosort.size() < nnzCol) tosort.resize(nnzCol);
+						
+						for(size_t j=0, k=colPtr_[i]; j<nnzCol; ++j, ++k)
+						{
+							tosort[j] = std::make_pair(rowIds_[k], nzVals_[k]);
+							max_row = std::max(max_row, rowIds_[k]);
+						}
 
-	isColSorted_ = true;
-	
+						//sort(tosort.begin(), tosort.end());
+						for(size_t expon = 1; max_row/expon > 0; expon *= 10){
+							count_sort(tosort, expon);
+						}
+						
+						size_t k = colPtr_[i];
+						rowIds_[k] = tosort[0].first;
+						nzVals_[k] = tosort[0].second;
+						
+						// k points to last updated entry
+						for(size_t j=1; j<nnzCol; ++j)
+						{
+								rowIds_[++k] = tosort[j].first;
+								nzVals_[k] = tosort[j].second;
+						}
+					}
+				}
+			
+
+			isColSorted_ = true;
+	}
+	else{
+		return;
+	}
 }
 
 

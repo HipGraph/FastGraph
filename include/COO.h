@@ -132,7 +132,7 @@ pvector<CIT> COO<RIT, CIT, VT>:: NnzPerRow()
 template <typename RIT, typename CIT, typename VT>
 pvector<RIT> COO<RIT, CIT, VT>:: NnzPerCol()
 {
-    pvector<RIT> nnzPerCol(nrows_, 0);
+    pvector<RIT> nnzPerCol(ncols_, 0);
 #pragma omp parallel for
     for (auto it = nzCols_.begin(); it < nzCols_.end(); it++)
     {
