@@ -229,7 +229,7 @@ void CSC<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
                 }
                 
                 //TODO: replace with radix or another integer sorting
-                sort(tosort.begin(), tosort.end());
+                sort(tosort.begin(), tosort.begin()+nnzCol);
                 
                 size_t k = colPtr_[i];
                 rowIds_[k] = tosort[0].first;
