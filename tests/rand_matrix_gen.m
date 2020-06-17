@@ -11,6 +11,8 @@ right = 5;
 % distributred, can also get gaussian distributed by changing sprand
 % function to sprandn in the first for loop
 
+% end of parameters to be set by user
+
 sum = sprand(rows, columns, 0);
 empty = [];
 dlmwrite(infile_name, empty, 'delimiter', ' ')
