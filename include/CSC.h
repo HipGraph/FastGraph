@@ -51,7 +51,9 @@ public:
 
 	const pvector<CPT>* get_colPtr(); // added by abhishek
 	const pvector<RIT>* get_rowIds(); 
-	const pvector<VT>* get_nzVals(); 
+	const pvector<VT>* get_nzVals();
+    
+    const CPT* get_colPtr(size_t idx);
 
 	CSC<RIT, VT, CPT>(CSC<RIT, VT, CPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isColSorted_(other.isColSorted_)   // added by abhishek
 	{
@@ -104,6 +106,12 @@ template <typename RIT, typename VT, typename CPT>
 const pvector<CPT>* CSC<RIT, VT, CPT>::get_colPtr()
 {
 	return &colPtr_;
+}
+
+template <typename RIT, typename VT, typename CPT>
+const CPT* CSC<RIT, VT, CPT>::get_colPtr(size_t idx)
+{
+    return &colPtr_[idx];
 }
 
 template <typename RIT, typename VT, typename CPT>
