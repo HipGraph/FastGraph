@@ -75,6 +75,9 @@ public:
 		nzVals_ = std::move(other.nzVals_);
 		return *this;
 	}
+    
+    bool operator== (const CSC<RIT, VT, CPT> & other);
+
 
 	size_t get_ncols(); // added by abhishek
 	size_t get_nrows();
@@ -89,6 +92,8 @@ public:
 
 	void print_all(); // added by abhishek
 
+    template <typename RIT1, typename CIT1, typename VT1, typename CPT1>
+    friend CSC<RIT1, VT1, CPT1> SpAddHash(std::vector<CSC<RIT1, VT1, CPT1>* > & matrices);
 
 private:
 	size_t nrows_;
@@ -185,6 +190,19 @@ void CSC<RIT, VT, CPT>::print_all()
 
 }
 
+
+
+//TODO: need parallel code
+template <typename RIT, typename VT, typename CPT>
+bool CSC<RIT, VT, CPT>::operator==(const CSC<RIT, VT, CPT> & rhs)
+{
+    if(nnz_ != rhs.nnz_ || nrows_  != rhs.nrows_ || ncols_ != rhs.ncols_) return false;
+    bool same = std::equal(colPtr_.begin(), colPtr_.begin()+ncols_+1, rhs.colPtr_.begin());
+    same = same && std::equal(rowIds_.begin(), rowIds_.begin()+nnz_, rhs.rowIds_.begin());
+    ErrorTolerantEqual<VT> epsilonequal(EPSILON);
+    same = same && std::equal(nzVals_.begin(), nzVals_.begin()+nnz_, rhs.nzVals_.begin(), epsilonequal );
+    return same;
+}
 
 template <typename RIT, typename VT, typename CPT>
 void CSC<RIT, VT, CPT>::PrintInfo()
