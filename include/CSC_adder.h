@@ -331,14 +331,14 @@ pvector<RIT> symbolic_add_vec_of_matrices_1(std::vector<CSC<RIT, VT, CPT>* > &ve
             nnzcol += (vec_of_matrices[k]->get_colPtr(i+1) - vec_of_matrices[k]->get_colPtr(i));
         }
             
-        size_t ht_size = minHashTableSize;
-        while(ht_size < nnzcol) //ht_size is set as 2^n
+        size_t htSize = minHashTableSize;
+        while(htSize < nnzcol) //htSize is set as 2^n
         {
-            ht_size <<= 1;
+            htSize <<= 1;
         }
-        if(globalHashVec.size() < ht_size)
-            globalHashVec.resize(ht_size);
-        for(size_t j=0; j < ht_size; ++j)
+        if(globalHashVec.size() < htSize)
+            globalHashVec.resize(htSize);
+        for(size_t j=0; j < htSize; ++j)
         {
             globalHashVec[j] = -1;
         }
@@ -351,7 +351,7 @@ pvector<RIT> symbolic_add_vec_of_matrices_1(std::vector<CSC<RIT, VT, CPT>* > &ve
             for(CPT j = (*col_ptr_i)[i]; j < (*col_ptr_i)[i+1]; j++)
             {
                 RIT key = (*row_ids_i)[j];
-                RIT hash = (key*hashScale) & (ht_size-1);
+                RIT hash = (key*hashScale) & (htSize-1);
                 
                 while (1) //hash probing
                 {
@@ -367,18 +367,18 @@ pvector<RIT> symbolic_add_vec_of_matrices_1(std::vector<CSC<RIT, VT, CPT>* > &ve
                     }
                     else //key is not found
                     {
-                        hash = (hash+1) & (ht_size-1);
+                        hash = (hash+1) & (htSize-1);
                     }
                 }
                 //curptr[i]++;
                 //umap[(*row_ids_i)[j] ] ++;
             }
             
-            //col_ptr_i = nullptr;
-            //row_ids_i = nullptr;
-            
-            //delete col_ptr_i;
-            //delete row_ids_i;
+//            col_ptr_i = nullptr;
+//            row_ids_i = nullptr;
+//
+//            delete col_ptr_i;
+//            delete row_ids_i;
             
         }
         //nz_per_column[i] = umap.size();
@@ -392,80 +392,79 @@ pvector<RIT> symbolic_add_vec_of_matrices_1(std::vector<CSC<RIT, VT, CPT>* > &ve
 //..........................................................................//
 
 
-template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM> // NM is number_of_matrices and CPT should include nnz range for the sum ie., should be suffice to be the CPT for sum
-
-CSC<RIT, VT, CPT> add_vec_of_matrices_3_1(std::vector<CSC<RIT, VT, CPT>* > &vec_of_matrices)          // optimised, used symbolic step to calculate the space needed and so no push_backs
+template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
+CSC<RIT, VT, CPT> SpAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices)
 {
+    int nmatrices = matrices.size();
+    // ---------- handling trivial cases ------------------
+    if(nmatrices == 0) return CSC<RIT, VT, CPT>();
+    // TODO: we need a copy constructor to cover this case
+    //if(nmatrices == 1) return CSC<RIT, VT, CPT>(*matrices[1]);
+    // TODO: Write a special version for two matrices (do we need hash? heap may be better)
+    //if(nmatrices == 2) return SpAdd(matrices[0], matrices[1]);
     
+    // ---------- checking if matrices can be added ------------------
+    CIT ncols = matrices[0]->get_ncols();
+    RIT nrows = matrices[0]->get_nrows();
     
-    assert(vec_of_matrices.size() != 0);
-    
-    CIT num_of_columns = vec_of_matrices[0]->get_ncols();
-    RIT num_of_rows = vec_of_matrices[0]->get_nrows();
-    
-#pragma omp parallel for
-    for(NM i = 0; i < vec_of_matrices.size(); i++){
-        assert(num_of_columns == vec_of_matrices[i]->get_ncols());
-        assert(num_of_rows == vec_of_matrices[i]->get_nrows());
+    for(int i = 1; i < nmatrices; i++)
+    {
+        if( (ncols != matrices[i]->get_ncols()) || (nrows != matrices[i]->get_nrows()))
+        {
+            std::cerr << " Can not be added as matrix dimensions do not agree. Returning an empty matrix. \n";
+            return CSC<RIT, VT, CPT>();
+        }
     }
     
-    pvector<RIT> nz_per_column = symbolic_add_vec_of_matrices_1<RIT, CIT, VT, CPT, NM>(vec_of_matrices);
 
+    // ---------- A symbolic step to estimate nnz ------------------
+    pvector<RIT> nnzPerCol = symbolic_add_vec_of_matrices_1<RIT, CIT, VT, CPT, int32_t>(matrices);
+    //pvector<RIT> nnzPerCol = symbolic_add_vec_of_matrices<RIT, CIT, VT, CPT, NM>(vec_of_matrices);
     
-    pvector<CPT> prefix_sum(num_of_columns+1);
-    // pvector<CPT> column_vector_for_csc(num_of_columns+1);
-    // prefix_sum[0] = 0;
-    // column_vector_for_csc[0] = 0;
+    pvector<CPT> prefix_sum(ncols+1);
+    ParallelPrefixSum(nnzPerCol, prefix_sum);
     
-    // for(CIT i = 1; i < num_of_columns+1; i++){
-    //     prefix_sum[i] = prefix_sum[i-1] + nz_per_column[i-1];
-    //     column_vector_for_csc[i] = prefix_sum[i];
-    // }
-    
-    ParallelPrefixSum(nz_per_column, prefix_sum);
     pvector<CPT> column_vector_for_csc(prefix_sum.begin(), prefix_sum.end());
-    
-    pvector<VT> value_vector_for_csc(prefix_sum[num_of_columns]);
-    pvector<RIT> row_vector_for_csc(prefix_sum[num_of_columns]);
+    pvector<VT> value_vector_for_csc(prefix_sum[ncols]);
+    pvector<RIT> row_vector_for_csc(prefix_sum[ncols]);
     
 
     const RIT minHashTableSize = 16;
     const RIT hashScale = 107;
-    NM number_of_matrices = vec_of_matrices.size();
+    
     
 
 #pragma omp parallel
     {
         std::vector< std::pair<RIT,VT>> globalHashVec(minHashTableSize);
 #pragma omp for
-        
-        for(CIT i = 0; i < num_of_columns; i++)
+        for(CIT i = 0; i < ncols; i++)
         {
-            
-            size_t ht_size = minHashTableSize;
-            while(ht_size < nz_per_column[i])
+            //----------- preparing the hash table for this column -------
+            size_t htSize = minHashTableSize;
+            while(htSize < nnzPerCol[i])
             {
-                ht_size <<= 1;
+                htSize <<= 1;
             }
-            if(globalHashVec.size() < ht_size)
-                globalHashVec.resize(ht_size);
-            for(size_t j=0; j < ht_size; ++j)
+            if(globalHashVec.size() < htSize)
+                globalHashVec.resize(htSize);
+            for(size_t j=0; j < htSize; ++j)
             {
                 globalHashVec[j].first = -1;
             }
             
-            for(NM k = 0; k < number_of_matrices; k++)
+            //----------- add this column form all matrices -------
+            for(int k = 0; k < nmatrices; k++)
             {
+                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                const pvector<VT> *nzVals = matrices[k]->get_nzVals();
                 
-                const pvector<CPT> *col_ptr_i = vec_of_matrices[k]->get_colPtr();
-                const pvector<RIT> *row_ids_i = vec_of_matrices[k]->get_rowIds();
-                const pvector<VT> *nz_i = vec_of_matrices[k]->get_nzVals();
-                
-                for(CPT j = (*col_ptr_i)[i]; j < (*col_ptr_i)[i+1]; j++)
+                for(CPT j = (*colPtr)[i]; j < (*colPtr)[i+1]; j++)
                 {
-                    RIT key = (*row_ids_i)[j];
-                    RIT hash = (key*hashScale) & (ht_size-1);
-                    VT curval = (*nz_i)[j];
+                    RIT key = (*rowIds)[j];
+                    RIT hash = (key*hashScale) & (htSize-1);
+                    VT curval = (*nzVals)[j];
                     while (1) //hash probing
                     {
                         if (globalHashVec[hash].first == key) //key is found in hash table
@@ -481,14 +480,14 @@ CSC<RIT, VT, CPT> add_vec_of_matrices_3_1(std::vector<CSC<RIT, VT, CPT>* > &vec_
                         }
                         else //key is not found
                         {
-                            hash = (hash+1) & (ht_size-1);
+                            hash = (hash+1) & (htSize-1);
                         }
                     }
                 }
             }
             
            
-            for (size_t j=0; j < ht_size; ++j)
+            for (size_t j=0; j < htSize; ++j)
             {
                 if (globalHashVec[j].first != -1)
                 {
@@ -506,7 +505,7 @@ CSC<RIT, VT, CPT> add_vec_of_matrices_3_1(std::vector<CSC<RIT, VT, CPT>* > &vec_
     Timer clock;
     clock.Start();
     
-    CSC<RIT, VT, CPT> result_matrix_csc(num_of_rows, num_of_columns, column_vector_for_csc[num_of_columns], false, true);
+    CSC<RIT, VT, CPT> result_matrix_csc(nrows, ncols, column_vector_for_csc[ncols], false, true);
     result_matrix_csc.nz_rows_pvector(&row_vector_for_csc);
     result_matrix_csc.cols_pvector(&column_vector_for_csc);
     result_matrix_csc.nz_vals_pvector(&value_vector_for_csc);
@@ -514,8 +513,6 @@ CSC<RIT, VT, CPT> add_vec_of_matrices_3_1(std::vector<CSC<RIT, VT, CPT>* > &vec_
     result_matrix_csc.sort_inside_column();
     
     clock.Stop();
-    //PrintTime("CSC Creation Time", clock.Seconds());
-    
     return std::move(result_matrix_csc);
     
 }

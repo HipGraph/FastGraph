@@ -6,6 +6,28 @@
 #include <string>
 #include "GAP/pvector.h"
 
+#define  EPSILON  0.001
+
+
+template <typename T>
+struct ErrorTolerantEqual:
+public std::binary_function< T, T, bool >
+{
+    ErrorTolerantEqual(const T & myepsilon):epsilon(myepsilon) {};
+    inline bool operator() (const T & a, const T & b) const
+    {
+        // According to the IEEE 754 standard, negative zero and positive zero should
+        // compare as equal with the usual (numerical) comparison operators, like the == operators of C++
+        
+        if(a == b)      // covers the "division by zero" case as well: max(a,b) can't be zero if it fails
+            return true;    // covered the integral numbers case
+        
+        return ( std::abs(a - b) < epsilon || (std::abs(a - b) / std::max(std::abs(a), std::abs(b))) < epsilon ) ;
+    }
+    T epsilon;
+};
+
+
 // TODO: just a temporary solution
 // use a better prefix sum (see mtspgemm code)
 template<typename T, typename SUMT>

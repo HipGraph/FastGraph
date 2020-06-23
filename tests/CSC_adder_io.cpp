@@ -53,6 +53,7 @@ void TestAll(std::vector< CSC<int32_t, int32_t, int32_t>* > vec)
     clock.Stop();
     std::cout<<" Symbolic new in seconds = "<< clock.Seconds()<<std::endl;
     
+    
     for(int i=0; i<sym1.size(); i++)
     {
         if(sym1[i] != sym2[i])
@@ -78,9 +79,15 @@ void TestAll(std::vector< CSC<int32_t, int32_t, int32_t>* > vec)
     std::cout<<" Option 3 function in seconds = "<< clock.Seconds()<<std::endl;
     
     clock.Start();
-    CSC<int32_t, int32_t, int32_t> result_3_1 = add_vec_of_matrices_3_1<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
+    CSC<int32_t, int32_t, int32_t> result_3_1 = SpAddHash<int32_t,int32_t, int32_t,int32_t> (vec);
     clock.Stop();
-    std::cout<<" Option azad function in seconds = "<< clock.Seconds()<<std::endl;
+    std::cout<<" Option 3.1 function in seconds = "<< clock.Seconds()<<std::endl;
+    
+    
+    if(result_3 == result_3_1 )
+        std::cout<<" Results equal :) \n";
+    else
+        std::cout<<" Results not equal :( \n";
     
     
     clock.Start();
