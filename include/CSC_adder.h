@@ -325,6 +325,8 @@ pvector<RIT> symbolic_add_vec_of_matrices_1(std::vector<CSC<RIT, VT, CPT>* > &ve
 #pragma omp for
     for(CIT i = 0; i < num_of_columns; i++)
     {
+        
+        nz_per_column[i] = 0;
         size_t nnzcol = 0;
         for(NM k = 0; k < number_of_matrices; k++)
         {
@@ -343,18 +345,18 @@ pvector<RIT> symbolic_add_vec_of_matrices_1(std::vector<CSC<RIT, VT, CPT>* > &ve
             globalHashVec[j] = -1;
         }
         
-        for(NM k = 0; k < number_of_matrices; k++){
-            
+        for(NM k = 0; k < number_of_matrices; k++)
+        {
             const pvector<CPT> *col_ptr_i = vec_of_matrices[k]->get_colPtr();
             const pvector<RIT> *row_ids_i = vec_of_matrices[k]->get_rowIds();
-            
             for(CPT j = (*col_ptr_i)[i]; j < (*col_ptr_i)[i+1]; j++)
             {
+                
                 RIT key = (*row_ids_i)[j];
                 RIT hash = (key*hashScale) & (htSize-1);
-                
                 while (1) //hash probing
                 {
+                    
                     if (globalHashVec[hash] == key) //key is found in hash table
                     {
                         break;
@@ -393,9 +395,11 @@ pvector<RIT> symbolic_add_vec_of_matrices_1(std::vector<CSC<RIT, VT, CPT>* > &ve
 
 
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
-CSC<RIT, VT, CPT> SpAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices)
+CSC<RIT, VT, CPT> SpAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, bool sorted=true)
 {
     int nmatrices = matrices.size();
+    
+    
     // ---------- handling trivial cases ------------------
     if(nmatrices == 0) return CSC<RIT, VT, CPT>();
     // TODO: we need a copy constructor to cover this case
@@ -419,14 +423,18 @@ CSC<RIT, VT, CPT> SpAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices)
 
     // ---------- A symbolic step to estimate nnz ------------------
     pvector<RIT> nnzPerCol = symbolic_add_vec_of_matrices_1<RIT, CIT, VT, CPT, int32_t>(matrices);
-    //pvector<RIT> nnzPerCol = symbolic_add_vec_of_matrices<RIT, CIT, VT, CPT, NM>(vec_of_matrices);
+    //pvector<RIT> nnzPerCol = symbolic_add_vec_of_matrices<RIT, CIT, VT, CPT, int32_t>(matrices);
     
     pvector<CPT> prefix_sum(ncols+1);
     ParallelPrefixSum(nnzPerCol, prefix_sum);
     
+    
+    CSC<RIT, VT, CPT> sumMat(nrows, ncols, prefix_sum[ncols], false, true);
+    
     pvector<CPT> column_vector_for_csc(prefix_sum.begin(), prefix_sum.end());
-    pvector<VT> value_vector_for_csc(prefix_sum[ncols]);
-    pvector<RIT> row_vector_for_csc(prefix_sum[ncols]);
+    //pvector<VT> value_vector_for_csc(prefix_sum[ncols]);
+    //pvector<RIT> row_vector_for_csc(prefix_sum[ncols]);
+    sumMat.cols_pvector(&column_vector_for_csc);
     
 
     const RIT minHashTableSize = 16;
@@ -487,14 +495,39 @@ CSC<RIT, VT, CPT> SpAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices)
             }
             
            
-            for (size_t j=0; j < htSize; ++j)
+            if(sorted)
             {
-                if (globalHashVec[j].first != -1)
+                size_t index = 0;
+                for (size_t j=0; j < htSize; ++j)
                 {
-                    
-                    row_vector_for_csc[prefix_sum[i] ] = globalHashVec[j].first;
-                    value_vector_for_csc[prefix_sum[i] ] = globalHashVec[j].second;
+                    if (globalHashVec[j].first != -1)
+                    {
+                       globalHashVec[index++] = globalHashVec[j];
+                    }
+                }
+                
+                // try radix sort
+                //std::sort(globalHashVec.begin(), globalHashVec.begin() + index, sort_less<IT, NT>);
+                std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
+                
+                
+                for (size_t j=0; j < index; ++j)
+                {
+                    sumMat.rowIds_[prefix_sum[i]] = globalHashVec[j].first;
+                    sumMat.nzVals_[prefix_sum[i]] = globalHashVec[j].second;
                     prefix_sum[i] ++;
+                }
+            }
+            else
+            {
+                for (size_t j=0; j < htSize; ++j)
+                {
+                    if (globalHashVec[j].first != -1)
+                    {
+                        sumMat.rowIds_[prefix_sum[i]] = globalHashVec[j].first;
+                        sumMat.nzVals_[prefix_sum[i]] = globalHashVec[j].second;
+                        prefix_sum[i] ++;
+                    }
                 }
             }
         }  // parallel programming ended
@@ -505,15 +538,15 @@ CSC<RIT, VT, CPT> SpAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices)
     Timer clock;
     clock.Start();
     
-    CSC<RIT, VT, CPT> result_matrix_csc(nrows, ncols, column_vector_for_csc[ncols], false, true);
-    result_matrix_csc.nz_rows_pvector(&row_vector_for_csc);
-    result_matrix_csc.cols_pvector(&column_vector_for_csc);
-    result_matrix_csc.nz_vals_pvector(&value_vector_for_csc);
+    //CSC<RIT, VT, CPT> result_matrix_csc(nrows, ncols, column_vector_for_csc[ncols], false, true);
+    //result_matrix_csc.nz_rows_pvector(&row_vector_for_csc);
+    //result_matrix_csc.cols_pvector(&column_vector_for_csc);
+    //result_matrix_csc.nz_vals_pvector(&value_vector_for_csc);
     
-    result_matrix_csc.sort_inside_column();
+    //result_matrix_csc.sort_inside_column();
     
     clock.Stop();
-    return std::move(result_matrix_csc);
+    return std::move(sumMat);
     
 }
 
