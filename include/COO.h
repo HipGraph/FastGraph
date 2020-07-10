@@ -200,7 +200,7 @@ void COO<RIT, CIT, VT>::GenER(int scale, int d, bool isWeighted, int64_t kRandSe
             {
                 nzRows_[i] = udist(rng);
                 nzCols_[i] = udist(rng);
-                if(isWeighted_) nzVals_[i] = static_cast<VT>(udist(rng)%255);
+                if(isWeighted_) nzVals_[i] = static_cast<VT>(udist(rng)%255+1);
             }
         }
     }
