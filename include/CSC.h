@@ -53,7 +53,7 @@ public:
 	const pvector<RIT>* get_rowIds(); 
 	const pvector<VT>* get_nzVals();
     
-    const CPT* get_colPtr(size_t idx);
+    const CPT get_colPtr(size_t idx);
 
 	CSC<RIT, VT, CPT>(CSC<RIT, VT, CPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isColSorted_(other.isColSorted_)   // added by abhishek
 	{
@@ -93,7 +93,7 @@ public:
 	void print_all(); // added by abhishek
 
     template <typename RIT1, typename CIT1, typename VT1, typename CPT1>
-    friend CSC<RIT1, VT1, CPT1> SpAddHash(std::vector<CSC<RIT1, VT1, CPT1>* > & matrices);
+    friend CSC<RIT1, VT1, CPT1> SpAddHash(std::vector<CSC<RIT1, VT1, CPT1>* > & matrices, bool sorted);
 
 private:
 	size_t nrows_;
@@ -114,9 +114,9 @@ const pvector<CPT>* CSC<RIT, VT, CPT>::get_colPtr()
 }
 
 template <typename RIT, typename VT, typename CPT>
-const CPT* CSC<RIT, VT, CPT>::get_colPtr(size_t idx)
+const CPT CSC<RIT, VT, CPT>::get_colPtr(size_t idx)
 {
-    return &colPtr_[idx];
+    return colPtr_[idx];
 }
 
 template <typename RIT, typename VT, typename CPT>
