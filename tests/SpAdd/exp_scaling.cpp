@@ -24,8 +24,8 @@ int main(){
     // below is method to use random matrices from COO.h
     for(int i = 0; i < k; i++){
         COO<int32_t, int32_t, int32_t> coo;
-        //coo.GenER(x,y,weighted);   //(x,y,true) Generate a weighted ER matrix with 2^x rows and columns and y nonzeros per column
-        coo.GenRMAT(x,y,weighted);   //(x,y,true) Generate a weighted RMAT matrix with 2^x rows and columns and y nonzeros per column
+        coo.GenER(x,y,weighted);   //(x,y,true) Generate a weighted ER matrix with 2^x rows and columns and y nonzeros per column
+        //coo.GenRMAT(x,y,weighted);   //(x,y,true) Generate a weighted RMAT matrix with 2^x rows and columns and y nonzeros per column
         vec.push_back(new CSC<int32_t, int32_t, int32_t>(coo));
     }
     
@@ -140,6 +140,7 @@ int main(){
 
     for(int i = 0; i < 3; i++){
         omp_set_num_threads(threads[i]);
+        mkl_set_num_threads(threads[i]);
         std::cout << "Using " << threads[i] << " threads" << std::endl;
 
         clock.Start();
@@ -181,35 +182,41 @@ int main(){
            if(mkl_sums[i] != NULL) mkl_sparse_destroy(mkl_sums[i]);
         }
 
-        clock.Start();
-        CSC<int32_t, int32_t, int32_t> result_1 = add_vec_of_matrices_1<int32_t, int32_t, int32_t,int32_t,int32_t> (vec);
-        clock.Stop();
-        std::cout<<"time for add_vec_of_matrices_1 function in seconds = "<< clock.Seconds()<<std::endl;
+
+        //clock.Start();
+        //CSC<int32_t, int32_t, int32_t> result_1 = add_vec_of_matrices_1<int32_t, int32_t, int32_t,int32_t,int32_t> (vec);
+        //clock.Stop();
+        //std::cout<<"time for add_vec_of_matrices_1 function in seconds = "<< clock.Seconds()<<std::endl;
         
-        clock.Start();
-        CSC<int32_t, int32_t, int32_t> result_2 = add_vec_of_matrices_2<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
-        clock.Stop();
-        std::cout<<"time for add_vec_of_matrices_2 function in seconds = "<< clock.Seconds()<<std::endl;
+        //clock.Start();
+        //CSC<int32_t, int32_t, int32_t> result_2 = add_vec_of_matrices_2<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
+        //clock.Stop();
+        //std::cout<<"time for add_vec_of_matrices_2 function in seconds = "<< clock.Seconds()<<std::endl;
+
+        //clock.Start();
+        //CSC<int32_t, int32_t, int32_t> result_3 = add_vec_of_matrices_3<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
+        //clock.Stop();
+        //std::cout<<"time for add_vec_of_matrices_3 function in seconds = "<< clock.Seconds()<<std::endl;
 
         clock.Start();
-        CSC<int32_t, int32_t, int32_t> result_3 = add_vec_of_matrices_3<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
+        CSC<int32_t, int32_t, int32_t> result_3_1 = SpAddHash<int32_t,int32_t, int32_t,int32_t> (vec);
         clock.Stop();
-        std::cout<<"time for add_vec_of_matrices_3 function in seconds = "<< clock.Seconds()<<std::endl;
+        std::cout<<"time for SpAddHash function in seconds = "<< clock.Seconds()<<std::endl;
 
-        clock.Start();
-        CSC<int32_t, int32_t, int32_t> result_4 = add_vec_of_matrices_4<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
-        clock.Stop();
-        std::cout<<"time for add_vec_of_matrices_4 function in seconds = "<< clock.Seconds()<<std::endl;
+        //clock.Start();
+        //CSC<int32_t, int32_t, int32_t> result_4 = add_vec_of_matrices_4<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
+        //clock.Stop();
+        //std::cout<<"time for add_vec_of_matrices_4 function in seconds = "<< clock.Seconds()<<std::endl;
 
-        clock.Start();
-        CSC<int32_t, int32_t, int32_t> result_5 = add_vec_of_matrices_5<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
-        clock.Stop();
-        std::cout<<"time for add_vec_of_matrices_5 function in seconds = "<< clock.Seconds()<<std::endl;
+        //clock.Start();
+        //CSC<int32_t, int32_t, int32_t> result_5 = add_vec_of_matrices_5<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
+        //clock.Stop();
+        //std::cout<<"time for add_vec_of_matrices_5 function in seconds = "<< clock.Seconds()<<std::endl;
 
-        clock.Start();
-        CSC<int32_t, int32_t, int32_t> result_6 = add_vec_of_matrices_6<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
-        clock.Stop();
-        std::cout<<"time for add_vec_of_matrices_6 function in seconds = "<< clock.Seconds()<<std::endl;
+        //clock.Start();
+        //CSC<int32_t, int32_t, int32_t> result_6 = add_vec_of_matrices_6<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
+        //clock.Stop();
+        //std::cout<<"time for add_vec_of_matrices_6 function in seconds = "<< clock.Seconds()<<std::endl;
     }
 
     for (int i = 0; i < k; i++){
