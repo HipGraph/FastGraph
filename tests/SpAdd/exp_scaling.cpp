@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <cmath>
 
 #include "../../include/CSC.h"
 #include "../../include/COO.h"
@@ -13,11 +14,11 @@
 #include "mkl_spblas.h"
 
 int main(){
-	int x = 20; // scale of radom matrix
+	int x = 20; // scale of random matrix
     int y = 8;  // average degree of random matrix
 	bool weighted = true;
 
-	int k = 100; // number of matrices
+	int k = 2; // number of matrices
 
 	std::vector< CSC<int32_t, int32_t, int32_t>* > vec;
 
@@ -34,10 +35,6 @@ int main(){
     /*
      *  Intel MKL specific codes
      * */
-    //MKL_INT** mkl_rowPtr = (MKL_INT**) malloc( k * sizeof(MKL_INT*) );
-    //MKL_INT** mkl_colIds = (MKL_INT**) malloc( k * sizeof(MKL_INT*) );
-    //double** mkl_nzVals = (double**) malloc( k * sizeof(double*) );
-
     double** mkl_values = (double**) malloc( k * sizeof(double*) );
     MKL_INT** mkl_rows = (MKL_INT**) malloc( k * sizeof(MKL_INT*) );
     MKL_INT** mkl_pointerB = (MKL_INT**) malloc( k * sizeof(MKL_INT*) );
@@ -59,11 +56,6 @@ int main(){
 
 //#pragma omp parallel
     for(int i = 0; i < k; i++){
-        //vec[i]->print_all();
-        // For now
-        // Treat created CSC matrix as CSR
-        // And create MKL CSR matrix from that
-        
         auto csc_nzVals = vec[i]->get_nzVals(); 
         mkl_values[i] = (double*) malloc( ( csc_nzVals->size() ) * sizeof(double) );
         for(int j = 0; j < csc_nzVals->size(); j++){
@@ -134,8 +126,6 @@ int main(){
     printf("MKL sparse matrices created\n");
 
 
-
-
     int threads[3] = {48, 24, 1};
 
     for(int i = 0; i < 3; i++){
@@ -146,7 +136,7 @@ int main(){
         clock.Start();
         for(int i = 1; i < k; i++){
             sparse_status_t add_status;
-            //printf("Adding matrix %d: ", i);
+            printf("Adding matrix %d: ", i);
             if(i == 1){
                 add_status = mkl_sparse_d_add(
                     SPARSE_OPERATION_NON_TRANSPOSE, 
@@ -165,58 +155,116 @@ int main(){
                     &(mkl_sums[i])
                 );
             }
-            //switch(add_status){
-                //case SPARSE_STATUS_SUCCESS: printf("SPARSE_STATUS_SUCCESS"); break;
-                //case SPARSE_STATUS_NOT_INITIALIZED: printf("SPARSE_STATUS_NOT_INITIALIZED"); break;
-                //case SPARSE_STATUS_ALLOC_FAILED: printf("SPARSE_STATUS_ALLOC_FAILED"); break;
-                //case SPARSE_STATUS_INVALID_VALUE: printf("SPARSE_STATUS_INVALID_VALUE"); break;
-                //case SPARSE_STATUS_EXECUTION_FAILED: printf("SPARSE_STATUS_EXECUTION_FAILED"); break;
-                //case SPARSE_STATUS_INTERNAL_ERROR: printf("SPARSE_STATUS_INTERNAL_ERROR"); break;
-                //case SPARSE_STATUS_NOT_SUPPORTED: printf("SPARSE_STATUS_NOT_SUPPORTED"); break;
-            //}
-            //printf("\n");
+            switch(add_status){
+                case SPARSE_STATUS_SUCCESS: printf("SPARSE_STATUS_SUCCESS"); break;
+                case SPARSE_STATUS_NOT_INITIALIZED: printf("SPARSE_STATUS_NOT_INITIALIZED"); break;
+                case SPARSE_STATUS_ALLOC_FAILED: printf("SPARSE_STATUS_ALLOC_FAILED"); break;
+                case SPARSE_STATUS_INVALID_VALUE: printf("SPARSE_STATUS_INVALID_VALUE"); break;
+                case SPARSE_STATUS_EXECUTION_FAILED: printf("SPARSE_STATUS_EXECUTION_FAILED"); break;
+                case SPARSE_STATUS_INTERNAL_ERROR: printf("SPARSE_STATUS_INTERNAL_ERROR"); break;
+                case SPARSE_STATUS_NOT_SUPPORTED: printf("SPARSE_STATUS_NOT_SUPPORTED"); break;
+            }
+            printf("\n");
         }
         clock.Stop();
         std::cout << "time for MKL in seconds " << clock.Seconds() << std::endl;
+
+        clock.Start();
+        //CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpMultiAddHash<int32_t,int32_t, int32_t,int32_t> (vec);
+        CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpAdd<int32_t,int32_t, int32_t,int32_t> (vec[0], vec[1]);
+        clock.Stop();
+        std::cout<<"time for SpAddHash function in seconds = "<< clock.Seconds()<<std::endl;
+        
+        printf("Transposing MKL output: ");
+        sparse_matrix_t *mkl_out = (sparse_matrix_t *) malloc( sizeof(sparse_matrix_t) );
+        sparse_status_t conv_status = mkl_sparse_convert_csr(
+            mkl_sums[k-1],
+            SPARSE_OPERATION_TRANSPOSE, // Transpose because it will make CSR matrix to be effectively CSC
+            mkl_out
+        );
+        switch(conv_status){
+            case SPARSE_STATUS_SUCCESS: printf("SPARSE_STATUS_SUCCESS"); break;
+            case SPARSE_STATUS_NOT_INITIALIZED: printf("SPARSE_STATUS_NOT_INITIALIZED"); break;
+            case SPARSE_STATUS_ALLOC_FAILED: printf("SPARSE_STATUS_ALLOC_FAILED"); break;
+            case SPARSE_STATUS_INVALID_VALUE: printf("SPARSE_STATUS_INVALID_VALUE"); break;
+            case SPARSE_STATUS_EXECUTION_FAILED: printf("SPARSE_STATUS_EXECUTION_FAILED"); break;
+            case SPARSE_STATUS_INTERNAL_ERROR: printf("SPARSE_STATUS_INTERNAL_ERROR"); break;
+            case SPARSE_STATUS_NOT_SUPPORTED: printf("SPARSE_STATUS_NOT_SUPPORTED"); break;
+        }
+        printf("\n");
+
+        printf("Exporting MKL output: ");
+        sparse_index_base_t out_indexing;
+        MKL_INT out_nrows;
+        MKL_INT out_ncols;
+        MKL_INT *out_pointerB = NULL;
+        MKL_INT *out_pointerE = NULL;
+        MKL_INT *out_rows = NULL;
+        double *out_values = NULL;
+        sparse_status_t export_status = mkl_sparse_d_export_csr (
+            *mkl_out,
+            &out_indexing,
+            &out_nrows,
+            &out_ncols,
+            &out_pointerB,
+            &out_pointerE,
+            &out_rows,
+            &out_values
+        );
+        switch(export_status){
+            case SPARSE_STATUS_SUCCESS: printf("SPARSE_STATUS_SUCCESS"); break;
+            case SPARSE_STATUS_NOT_INITIALIZED: printf("SPARSE_STATUS_NOT_INITIALIZED"); break;
+            case SPARSE_STATUS_ALLOC_FAILED: printf("SPARSE_STATUS_ALLOC_FAILED"); break;
+            case SPARSE_STATUS_INVALID_VALUE: printf("SPARSE_STATUS_INVALID_VALUE"); break;
+            case SPARSE_STATUS_EXECUTION_FAILED: printf("SPARSE_STATUS_EXECUTION_FAILED"); break;
+            case SPARSE_STATUS_INTERNAL_ERROR: printf("SPARSE_STATUS_INTERNAL_ERROR"); break;
+            case SPARSE_STATUS_NOT_SUPPORTED: printf("SPARSE_STATUS_NOT_SUPPORTED"); break;
+        }
+        printf("\n");
+ 
+        auto SpAddHash_colPtr = SpAddHash_out.get_colPtr();
+        auto SpAddHash_rowIds = SpAddHash_out.get_rowIds();
+        auto SpAddHash_nzVals = SpAddHash_out.get_nzVals();
+
+        printf("SpAddHash vs MKL Output Comparison\n");
+        printf("==================================\n");
+        printf("Number of columns: %ld vs %ld\n", SpAddHash_colPtr->size()-1, out_ncols);
+
+        bool correct = true;
+        if ((*SpAddHash_colPtr)[0] != out_pointerB[0]) correct = false;
+        for (int i = 0; i < out_ncols; i++){
+            if ((*SpAddHash_colPtr)[i+1] != out_pointerE[i]){
+                correct = false;
+                break;
+            }
+        }
+        if(correct == false) printf("Column pointers did not match\n");
+        else printf("Column pointers matched\n");
+
+        for (int i = 0; i < out_pointerE[out_ncols-1] && correct; i++){
+            if( (*SpAddHash_rowIds)[i] != out_rows[i] ){
+                correct = false;
+                break;
+            }
+        }
+        if(correct == false) printf("Row ids did not match\n");
+        else printf("Row ids matched\n");
+
+        for (int i = 0; i < out_pointerE[out_ncols-1] && correct; i++){
+            //std::cout << (*SpAddHash_nzVals)[i] << " vs " << out_values[i] << std::endl;
+            if( abs((*SpAddHash_nzVals)[i] - out_values[i]) > 1e3 ){
+                correct = false;
+                break;
+            }
+        }
+        if(correct == false) printf("Nonzeros did not match\n");
+        else printf("Nonzeros matched\n");
+        printf("===========================\n");
+        
+        mkl_sparse_destroy(*mkl_out);
         for (int i = 0; i < k; i++){
            if(mkl_sums[i] != NULL) mkl_sparse_destroy(mkl_sums[i]);
         }
-
-
-        //clock.Start();
-        //CSC<int32_t, int32_t, int32_t> result_1 = add_vec_of_matrices_1<int32_t, int32_t, int32_t,int32_t,int32_t> (vec);
-        //clock.Stop();
-        //std::cout<<"time for add_vec_of_matrices_1 function in seconds = "<< clock.Seconds()<<std::endl;
-        
-        //clock.Start();
-        //CSC<int32_t, int32_t, int32_t> result_2 = add_vec_of_matrices_2<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
-        //clock.Stop();
-        //std::cout<<"time for add_vec_of_matrices_2 function in seconds = "<< clock.Seconds()<<std::endl;
-
-        //clock.Start();
-        //CSC<int32_t, int32_t, int32_t> result_3 = add_vec_of_matrices_3<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
-        //clock.Stop();
-        //std::cout<<"time for add_vec_of_matrices_3 function in seconds = "<< clock.Seconds()<<std::endl;
-
-        clock.Start();
-        CSC<int32_t, int32_t, int32_t> result_3_1 = SpAddHash<int32_t,int32_t, int32_t,int32_t> (vec);
-        clock.Stop();
-        std::cout<<"time for SpAddHash function in seconds = "<< clock.Seconds()<<std::endl;
-
-        //clock.Start();
-        //CSC<int32_t, int32_t, int32_t> result_4 = add_vec_of_matrices_4<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
-        //clock.Stop();
-        //std::cout<<"time for add_vec_of_matrices_4 function in seconds = "<< clock.Seconds()<<std::endl;
-
-        //clock.Start();
-        //CSC<int32_t, int32_t, int32_t> result_5 = add_vec_of_matrices_5<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
-        //clock.Stop();
-        //std::cout<<"time for add_vec_of_matrices_5 function in seconds = "<< clock.Seconds()<<std::endl;
-
-        //clock.Start();
-        //CSC<int32_t, int32_t, int32_t> result_6 = add_vec_of_matrices_6<int32_t,int32_t, int32_t,int32_t,int32_t> (vec);
-        //clock.Stop();
-        //std::cout<<"time for add_vec_of_matrices_6 function in seconds = "<< clock.Seconds()<<std::endl;
     }
 
     for (int i = 0; i < k; i++){
