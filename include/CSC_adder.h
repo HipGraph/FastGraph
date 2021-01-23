@@ -307,7 +307,6 @@ pvector<RIT> symbolic_add_vec_of_matrices(std::vector<CSC<RIT, VT, CPT>* > &vec_
 
 
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM>
-
 pvector<RIT> symbolic_add_vec_of_matrices_1(std::vector<CSC<RIT, VT, CPT>* > &vec_of_matrices)
 {
     
@@ -395,7 +394,7 @@ pvector<RIT> symbolic_add_vec_of_matrices_1(std::vector<CSC<RIT, VT, CPT>* > &ve
 
 
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
-CSC<RIT, VT, CPT> SpAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, bool sorted=true)
+CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, bool sorted=true)
 {
     int nmatrices = matrices.size();
     
@@ -550,6 +549,248 @@ CSC<RIT, VT, CPT> SpAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, bool so
     
 }
 
+/*
+ *  Estimates nnumber of non-zeroes when adding two CSC matrices in regular way
+ *  Assumes that entries of each column are sorted according to the order of row id
+ * */
+template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
+pvector<RIT> symbolicSpAddRegular(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B){
+    double t0, t1, t3, t4;
+
+    t0 = omp_get_wtime();
+
+    CIT ncols = A->get_ncols();
+    RIT nrows = A->get_nrows();
+    const pvector<CPT> *AcolPtr = A->get_colPtr();
+    const pvector<RIT> *ArowIds = A->get_rowIds();
+    const pvector<VT> *AnzVals = A->get_nzVals();
+    const pvector<CPT> *BcolPtr = B->get_colPtr();
+    const pvector<RIT> *BrowIds = B->get_rowIds();
+    const pvector<VT> *BnzVals = B->get_nzVals();
+
+    pvector<RIT> nnzCPerCol(ncols);
+    
+    t1 = omp_get_wtime();
+    printf("[symbolicSpAddRegular] Time taken before parallel section %lf\n", (t1-t0));
+   
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        double ttime = omp_get_wtime();
+#pragma omp for
+        // Process each column in parallel
+        for(CIT i = 0; i < ncols; i++){
+            RIT ArowsStart = (*AcolPtr)[i];
+            RIT ArowsEnd = (*AcolPtr)[i+1];
+            RIT BrowsStart = (*BcolPtr)[i];
+            RIT BrowsEnd = (*BcolPtr)[i+1];
+            RIT Aptr = ArowsStart;
+            RIT Bptr = BrowsStart;
+            RIT Cptr = i;
+            nnzCPerCol[Cptr] = 0;
+
+            while (Aptr < ArowsEnd || Bptr < BrowsEnd){
+                if (Aptr >= ArowsEnd){
+                    // Entries of A has finished
+                    // Copy the entry of BPtr to the CPtr
+                    // Increment BPtr and CPtr
+                    nnzCPerCol[Cptr]++;
+                    Bptr++;
+                    Cptr++;
+                }
+                else if (Bptr >= BrowsEnd){
+                    // Entries of B has finished
+                    // Copy the entry of APtr to the CPtr
+                    // Increment APtr and CPtr
+                    nnzCPerCol[Cptr]++;
+                    Aptr++;
+                    Cptr++;
+                }
+                else {
+                    if ( (*ArowIds)[Aptr] < (*BrowIds)[Bptr]){
+                        // Copy the entry of APtr to the CPtr
+                        // Increment APtr and CPtr
+                        nnzCPerCol[Cptr]++;
+                        Aptr++;
+                        Cptr++;
+                    }
+                    else if ((*ArowIds)[Aptr] > (*BrowIds)[Bptr]){
+                        // Copy the entry of BPtr to the CPtr
+                        // Increment BPtr and CPtr
+                        nnzCPerCol[Cptr]++;
+                        Bptr++;
+                        Cptr++;
+                    }
+                    else{
+                        // Sum the entries of APtr and BPtr then store at CPtr
+                        // Increment APtr, BPtr and CPtr
+                        nnzCPerCol[Cptr]++;
+                        Aptr++;
+                        Bptr++;
+                        Cptr++;
+                    }
+                }
+            }
+        }
+        ttime = omp_get_wtime() - ttime;
+        printf( "[symbolicSpAddRegular] Time taken by thread %d is %f\n", omp_get_thread_num(), ttime );
+    }
+    t1 = omp_get_wtime();
+    printf("[symbolicSpAddRegular] Time taken for parallel section %lf\n", (t1-t0));
+
+    return std::move(nnzCPerCol);
+}
+
+/*
+ *  Adds two CSC matrices in regular way (the way merge operation of MergeSort works)
+ *  Assumes that entries of each column are sorted according to the order of row id
+ *  Assumes that all sanity checks are done before, so do not perform any
+ * */
+template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
+CSC<RIT, VT, CPT> SpAddRegular(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, pvector<RIT> & nnzCPerCol){
+    double t0, t1, t3, t4;
+
+    t0 = omp_get_wtime();
+
+    CIT ncols = A->get_ncols();
+    RIT nrows = A->get_nrows();
+    const pvector<CPT> *AcolPtr = A->get_colPtr();
+    const pvector<RIT> *ArowIds = A->get_rowIds();
+    const pvector<VT> *AnzVals = A->get_nzVals();
+    const pvector<CPT> *BcolPtr = B->get_colPtr();
+    const pvector<RIT> *BrowIds = B->get_rowIds();
+    const pvector<VT> *BnzVals = B->get_nzVals();
+
+    pvector<CPT> prefixSum(ncols+1);
+    ParallelPrefixSum(nnzCPerCol, prefixSum);
+    CSC<RIT, VT, CPT> C(nrows, ncols, prefixSum[ncols], false, true);
+    
+    pvector<CPT> CcolPtr(prefixSum.begin(), prefixSum.end());
+    pvector<RIT> CrowIds(prefixSum[ncols]);
+    pvector<VT> CnzVals(prefixSum[ncols]);
+
+    t1 = omp_get_wtime();
+    printf("[SpAddRegular] Time taken before parallel section %lf\n", (t1-t0));
+   
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        double ttime = omp_get_wtime();
+#pragma omp for
+        // Process each column in parallel
+        for(CIT i = 0; i < ncols; i++){
+            RIT ArowsStart = (*AcolPtr)[i];
+            RIT ArowsEnd = (*AcolPtr)[i+1];
+            RIT BrowsStart = (*BcolPtr)[i];
+            RIT BrowsEnd = (*BcolPtr)[i+1];
+            RIT Aptr = ArowsStart;
+            RIT Bptr = BrowsStart;
+            RIT Cptr = prefixSum[i];
+            while (Aptr < ArowsEnd || Bptr < BrowsEnd){
+                if (Aptr >= ArowsEnd){
+                    // Entries of A has finished
+                    // Copy the entry of BPtr to the CPtr
+                    // Increment BPtr and CPtr
+                    CrowIds[Cptr] = (*BrowIds)[Bptr];
+                    CnzVals[Cptr] = (*BnzVals)[Bptr];
+                    Bptr++;
+                    Cptr++;
+                }
+                else if (Bptr >= BrowsEnd){
+                    // Entries of B has finished
+                    // Copy the entry of APtr to the CPtr
+                    // Increment APtr and CPtr
+                    CrowIds[Cptr] = (*ArowIds)[Aptr];
+                    CnzVals[Cptr] = (*AnzVals)[Aptr];
+                    Aptr++;
+                    Cptr++;
+                }
+                else {
+                    if ( (*ArowIds)[Aptr] < (*BrowIds)[Bptr]){
+                        // Copy the entry of APtr to the CPtr
+                        // Increment APtr and CPtr
+                        CrowIds[Cptr] = (*ArowIds)[Aptr];
+                        CnzVals[Cptr] = (*AnzVals)[Aptr];
+                        Aptr++;
+                        Cptr++;
+                    }
+                    else if ((*ArowIds)[Aptr] > (*BrowIds)[Bptr]){
+                        // Copy the entry of BPtr to the CPtr
+                        // Increment BPtr and CPtr
+                        CrowIds[Cptr] = (*BrowIds)[Bptr];
+                        CnzVals[Cptr] = (*BnzVals)[Bptr];
+                        Bptr++;
+                        Cptr++;
+                    }
+                    else{
+                        // Sum the entries of APtr and BPtr then store at CPtr
+                        // Increment APtr, BPtr and CPtr
+                        CrowIds[Cptr] = (*ArowIds)[Aptr];
+                        CnzVals[Cptr] = (*AnzVals)[Aptr] + (*BnzVals)[Bptr];
+                        Aptr++;
+                        Bptr++;
+                        Cptr++;
+                    }
+                }
+            }
+        }
+        ttime = omp_get_wtime() - ttime;
+        printf( "[SpAddRegular] Time taken by thread %d is %f\n", omp_get_thread_num(), ttime );
+    }
+    t1 = omp_get_wtime();
+    printf("[SpAddRegular] Time taken for parallel section %lf\n", (t1-t0));
+
+    t0 = omp_get_wtime();
+
+    C.cols_pvector(&CcolPtr);
+    C.nz_rows_pvector(&CrowIds);
+    C.nz_vals_pvector(&CnzVals);
+
+    t1 = omp_get_wtime();
+    printf("[SpAddRegular] Time taken after parallel section %lf\n", (t1-t0));
+
+    return std::move(C);
+}
+
+/*
+ *  Routing function to add two CSC matrices
+ *  Checks different criteria to decide which implementation to use
+ *  Returns another CSC matrix
+ * */
+template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
+CSC<RIT, VT, CPT> SpAdd(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, bool inputSorted=true, bool outputSorted=true){
+    double t0, t1, t2, t3; 
+
+    CIT ncols = A->get_ncols();
+    RIT nrows = A->get_nrows();
+
+    // ---------- checking if matrices can be added ------------------
+    if( (nrows != B->get_nrows()) || (ncols != B->get_ncols()) ){
+        std::cerr << " Can not be added as matrix dimensions do not agree. Returning an empty matrix. \n";
+        return CSC<RIT, VT, CPT>();
+    }
+
+    t0 = omp_get_wtime();
+    // ---------- A symbolic step to estimate nnz ------------------
+    std::vector<CSC<RIT, VT, CPT>*> matrices(2);
+    matrices[0] = A;
+    matrices[1] = B;
+    pvector<RIT> nnzCPerCol = symbolic_add_vec_of_matrices_1<RIT, CIT, VT, CPT, int32_t>(matrices);
+    //pvector<RIT> nnzCPerCol = symbolic_add_vec_of_matrices<RIT, CIT, VT, CPT, int32_t>(matrices);
+    //pvector<RIT> nnzCPerCol = symbolicSpAddRegular<RIT, CIT, VT, CPT>(A, B);
+    t1 = omp_get_wtime();
+    printf("[SpAdd] Time taken by symbolic: %lf\n", t1-t0);
+
+    if(inputSorted){
+        // Use SpAddRegular
+        return SpAddRegular<RIT, CIT, VT, CPT>(A, B, nnzCPerCol);
+    }
+    else{
+        // To Do: Probably using SpAddHash would be better      
+        // Temporarily using regular one for the sake of semantic correctness of the function
+        return SpAddRegular<RIT, CIT, VT, CPT>(A, B, nnzCPerCol);
+    }
+}
 
 
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM> // NM is number_of_matrices and CPT should include nnz range for the sum ie., should be suffice to be the CPT for sum
