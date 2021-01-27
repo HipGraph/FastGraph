@@ -567,67 +567,63 @@ pvector<RIT> symbolicSpAddRegular(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B){
     const pvector<CPT> *BcolPtr = B->get_colPtr();
     const pvector<RIT> *BrowIds = B->get_rowIds();
     const pvector<VT> *BnzVals = B->get_nzVals();
-
+    
     pvector<RIT> nnzCPerCol(ncols);
     
     t1 = omp_get_wtime();
     printf("[symbolicSpAddRegular] Time taken before parallel section %lf\n", (t1-t0));
-   
+    
     t0 = omp_get_wtime();
 #pragma omp parallel
     {
         double ttime = omp_get_wtime();
 #pragma omp for
         // Process each column in parallel
-        for(CIT i = 0; i < ncols; i++){
+            for(CIT i = 0; i < ncols; i++){
             RIT ArowsStart = (*AcolPtr)[i];
             RIT ArowsEnd = (*AcolPtr)[i+1];
             RIT BrowsStart = (*BcolPtr)[i];
             RIT BrowsEnd = (*BcolPtr)[i+1];
             RIT Aptr = ArowsStart;
             RIT Bptr = BrowsStart;
-            RIT Cptr = i;
-            nnzCPerCol[Cptr] = 0;
-
+            nnzCPerCol[i] = 0;
+            
+            
             while (Aptr < ArowsEnd || Bptr < BrowsEnd){
                 if (Aptr >= ArowsEnd){
                     // Entries of A has finished
-                    // Copy the entry of BPtr to the CPtr
-                    // Increment BPtr and CPtr
-                    nnzCPerCol[Cptr]++;
+                    // Increment nnzCPerCol[i]
+                    // Increment BPtr
+                    nnzCPerCol[i]++;
                     Bptr++;
-                    Cptr++;
                 }
                 else if (Bptr >= BrowsEnd){
                     // Entries of B has finished
-                    // Copy the entry of APtr to the CPtr
-                    // Increment APtr and CPtr
-                    nnzCPerCol[Cptr]++;
+                    // Increment nnzCPerCol[i]
+                    // Increment APtr
+                    nnzCPerCol[i]++;
                     Aptr++;
-                    Cptr++;
                 }
                 else {
                     if ( (*ArowIds)[Aptr] < (*BrowIds)[Bptr]){
-                        // Copy the entry of APtr to the CPtr
-                        // Increment APtr and CPtr
-                        nnzCPerCol[Cptr]++;
+                        // Increment nnzCPerCol[i]
+                        // Increment APtr 
+                                     
+                        nnzCPerCol[i]++;
                         Aptr++;
-                        Cptr++;
                     }
                     else if ((*ArowIds)[Aptr] > (*BrowIds)[Bptr]){
-                        // Copy the entry of BPtr to the CPtr
-                        // Increment BPtr and CPtr
-                        nnzCPerCol[Cptr]++;
+                        // Increment nnzCPerCol[i]     
+                        // Increment BPtr
+                        nnzCPerCol[i]++;
                         Bptr++;
-                        Cptr++;
                     }
                     else{
-                        // Sum the entries of APtr and BPtr then store at CPtr
-                        // Increment APtr, BPtr and CPtr
-                        nnzCPerCol[Cptr]++;
+                        // Increment nnzCPerCol[i]
+                        // Increment APtr, BPtr 
+                        nnzCPerCol[i]++;
                         Aptr++;
                         Bptr++;
-                        Cptr++;
                     }
                 }
             }
@@ -637,7 +633,6 @@ pvector<RIT> symbolicSpAddRegular(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B){
     }
     t1 = omp_get_wtime();
     printf("[symbolicSpAddRegular] Time taken for parallel section %lf\n", (t1-t0));
-
     return std::move(nnzCPerCol);
 }
 
@@ -686,6 +681,7 @@ CSC<RIT, VT, CPT> SpAddRegular(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, pvect
             RIT Aptr = ArowsStart;
             RIT Bptr = BrowsStart;
             RIT Cptr = prefixSum[i];
+
             while (Aptr < ArowsEnd || Bptr < BrowsEnd){
                 if (Aptr >= ArowsEnd){
                     // Entries of A has finished
@@ -775,9 +771,11 @@ CSC<RIT, VT, CPT> SpAdd(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, bool inputSo
     std::vector<CSC<RIT, VT, CPT>*> matrices(2);
     matrices[0] = A;
     matrices[1] = B;
-    pvector<RIT> nnzCPerCol = symbolic_add_vec_of_matrices_1<RIT, CIT, VT, CPT, int32_t>(matrices);
+    //pvector<RIT> nnzCPerCol = symbolic_add_vec_of_matrices_1<RIT, CIT, VT, CPT, int32_t>(matrices);
     //pvector<RIT> nnzCPerCol = symbolic_add_vec_of_matrices<RIT, CIT, VT, CPT, int32_t>(matrices);
-    //pvector<RIT> nnzCPerCol = symbolicSpAddRegular<RIT, CIT, VT, CPT>(A, B);
+    pvector<RIT> nnzCPerCol = symbolicSpAddRegular<RIT, CIT, VT, CPT>(A, B);
+    double j = 0;
+    
     t1 = omp_get_wtime();
     printf("[SpAdd] Time taken by symbolic: %lf\n", t1-t0);
 
@@ -789,7 +787,8 @@ CSC<RIT, VT, CPT> SpAdd(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, bool inputSo
         // To Do: Probably using SpAddHash would be better      
         // Temporarily using regular one for the sake of semantic correctness of the function
         return SpAddRegular<RIT, CIT, VT, CPT>(A, B, nnzCPerCol);
-    }
+    } 
+    
 }
 
 
