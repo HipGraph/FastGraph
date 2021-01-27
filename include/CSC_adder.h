@@ -426,14 +426,13 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, bo
     
     pvector<CPT> prefix_sum(ncols+1);
     ParallelPrefixSum(nnzPerCol, prefix_sum);
-    
-    
+
+    pvector<CPT> CcolPtr(prefix_sum.begin(), prefix_sum.end());
+    pvector<RIT> CrowIds(prefix_sum[ncols]);
+    pvector<VT> CnzVals(prefix_sum[ncols]);
+
     CSC<RIT, VT, CPT> sumMat(nrows, ncols, prefix_sum[ncols], false, true);
-    
-    pvector<CPT> column_vector_for_csc(prefix_sum.begin(), prefix_sum.end());
-    //pvector<VT> value_vector_for_csc(prefix_sum[ncols]);
-    //pvector<RIT> row_vector_for_csc(prefix_sum[ncols]);
-    sumMat.cols_pvector(&column_vector_for_csc);
+    sumMat.cols_pvector(&CcolPtr);
     
 
     const RIT minHashTableSize = 16;
@@ -512,8 +511,8 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, bo
                 
                 for (size_t j=0; j < index; ++j)
                 {
-                    sumMat.rowIds_[prefix_sum[i]] = globalHashVec[j].first;
-                    sumMat.nzVals_[prefix_sum[i]] = globalHashVec[j].second;
+                    CrowIds[prefix_sum[i]] = globalHashVec[j].first;
+                    CnzVals[prefix_sum[i]] = globalHashVec[j].second;
                     prefix_sum[i] ++;
                 }
             }
@@ -523,8 +522,8 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, bo
                 {
                     if (globalHashVec[j].first != -1)
                     {
-                        sumMat.rowIds_[prefix_sum[i]] = globalHashVec[j].first;
-                        sumMat.nzVals_[prefix_sum[i]] = globalHashVec[j].second;
+                        CrowIds[prefix_sum[i]] = globalHashVec[j].first;
+                        CnzVals[prefix_sum[i]] = globalHashVec[j].second;
                         prefix_sum[i] ++;
                     }
                 }
@@ -537,12 +536,8 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, bo
     Timer clock;
     clock.Start();
     
-    //CSC<RIT, VT, CPT> result_matrix_csc(nrows, ncols, column_vector_for_csc[ncols], false, true);
-    //result_matrix_csc.nz_rows_pvector(&row_vector_for_csc);
-    //result_matrix_csc.cols_pvector(&column_vector_for_csc);
-    //result_matrix_csc.nz_vals_pvector(&value_vector_for_csc);
-    
-    //result_matrix_csc.sort_inside_column();
+    sumMat.nz_rows_pvector(&CrowIds);
+    sumMat.nz_vals_pvector(&CnzVals);
     
     clock.Stop();
     return std::move(sumMat);
@@ -579,7 +574,7 @@ pvector<RIT> symbolicSpAddRegular(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B){
         double ttime = omp_get_wtime();
 #pragma omp for
         // Process each column in parallel
-            for(CIT i = 0; i < ncols; i++){
+        for(CIT i = 0; i < ncols; i++){
             RIT ArowsStart = (*AcolPtr)[i];
             RIT ArowsEnd = (*AcolPtr)[i+1];
             RIT BrowsStart = (*BcolPtr)[i];
@@ -587,7 +582,6 @@ pvector<RIT> symbolicSpAddRegular(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B){
             RIT Aptr = ArowsStart;
             RIT Bptr = BrowsStart;
             nnzCPerCol[i] = 0;
-            
             
             while (Aptr < ArowsEnd || Bptr < BrowsEnd){
                 if (Aptr >= ArowsEnd){
@@ -608,7 +602,6 @@ pvector<RIT> symbolicSpAddRegular(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B){
                     if ( (*ArowIds)[Aptr] < (*BrowIds)[Bptr]){
                         // Increment nnzCPerCol[i]
                         // Increment APtr 
-                                     
                         nnzCPerCol[i]++;
                         Aptr++;
                     }
