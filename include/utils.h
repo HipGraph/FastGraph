@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <cinttypes>
 #include <string>
+#include <cmath>
 #include "GAP/pvector.h"
 
 #define  EPSILON  0.001
@@ -65,6 +66,32 @@ static void ParallelPrefixSum(const pvector<T> &degrees, pvector<SUMT>& prefix)
     prefix[degrees.size()] = bulk_prefix[num_blocks];
 }
 
+/*
+ *  Prints mean and variance of an array
+ *  Not parallelized, parallelize if needed
+ * */
+template<typename T>
+static void printStats(pvector<T> &arr){
+    double mu = 0;
+    double sig2 = 0;
+    T max_val = arr[0];
+    T min_val = arr[0];
+#pragma omp parallel for default(shared) reduction(+: mu) reduction(max:max_val) reduction(min:min_val)
+    for(int i = 0; i < arr.size(); i++){
+        mu += (double)arr[i];
+        if(arr[i] > max_val) max_val = arr[i];
+        if(arr[i] < min_val) min_val = arr[i];
+    }
+    mu = mu / arr.size();
+#pragma omp parallel for default(shared) reduction(+: sig2)
+    for(int i = 0; i < arr.size(); i++) sig2 += (mu-(double)arr[i])*(mu-(double)arr[i]);
+    sig2 = sig2 / arr.size();
+    std::cout << "\t[printStats] Max:" << max_val << std::endl;
+    std::cout << "\t[printStats] Min:" << min_val << std::endl;
+    std::cout << "\t[printStats] Mean:" << mu << std::endl;
+    std::cout << "\t[printStats] Std-Dev:" << sqrt(sig2) << std::endl;
+    return;
+}
 
 
 #endif  // UTILS_H_

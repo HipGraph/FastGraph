@@ -14,19 +14,19 @@
 #include "mkl_spblas.h"
 
 int main(){
-	int x = 20; // scale of random matrix
+    int x = 20; // scale of random matrix
     int y = 8;  // average degree of random matrix
 	bool weighted = true;
 
-	int k = 2; // number of matrices
+	int k = 2;// number of matrices
 
 	std::vector< CSC<int32_t, int32_t, int32_t>* > vec;
 
     // below is method to use random matrices from COO.h
     for(int i = 0; i < k; i++){
         COO<int32_t, int32_t, int32_t> coo;
-        coo.GenER(x,y,weighted);   //(x,y,true) Generate a weighted ER matrix with 2^x rows and columns and y nonzeros per column
-        //coo.GenRMAT(x,y,weighted);   //(x,y,true) Generate a weighted RMAT matrix with 2^x rows and columns and y nonzeros per column
+        //coo.GenER(x,y,weighted, 2022021);   //(x,y,true) Generate a weighted ER matrix with 2^x rows and columns and y nonzeros per column
+        coo.GenRMAT(x,y,weighted, 2022021);   //(x,y,true) Generate a weighted RMAT matrix with 2^x rows and columns and y nonzeros per column
         vec.push_back(new CSC<int32_t, int32_t, int32_t>(coo));
     }
     
@@ -106,7 +106,7 @@ int main(){
         }
         printf("\n");
 
-        printf("Converting MKL CSC matrix %d to CSR: ", i);
+        //printf("Converting MKL CSC matrix %d to CSR: ", i);
         sparse_status_t conv_status = mkl_sparse_convert_csr (
             mkl_csc_matrices[i],
             SPARSE_OPERATION_NON_TRANSPOSE,
@@ -124,14 +124,16 @@ int main(){
         printf("\n");
     }
     printf("MKL sparse matrices created\n");
+    printf("\n");
 
 
-    int threads[3] = {48, 24, 1};
+    int threads[5] = {1, 6, 12, 24, 48};
+    //int threads[1] = {2};
 
-    for(int i = 0; i < 3; i++){
+    for(int i = 0; i < 5; i++){
         omp_set_num_threads(threads[i]);
         mkl_set_num_threads(threads[i]);
-        std::cout << "Using " << threads[i] << " threads" << std::endl;
+        std::cout << ">>> Using " << threads[i] << " threads" << std::endl;
 
         clock.Start();
         for(int i = 1; i < k; i++){
@@ -169,11 +171,16 @@ int main(){
         clock.Stop();
         std::cout << "time for MKL in seconds " << clock.Seconds() << std::endl;
 
+
         clock.Start();
-        //CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpMultiAddHash<int32_t,int32_t, int32_t,int32_t> (vec);
         CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpAdd<int32_t,int32_t, int32_t,int32_t> (vec[0], vec[1]);
         clock.Stop();
-        std::cout<<"time for SpAddHash function in seconds = "<< clock.Seconds()<<std::endl;
+        std::cout<<"time for SpAdd function in seconds = "<< clock.Seconds()<<std::endl;
+
+        //clock.Start();
+        //CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpMultiAddHash<int32_t,int32_t, int32_t,int32_t> (vec);
+        //clock.Stop();
+        //std::cout<<"time for SpMultiAddHash function in seconds = "<< clock.Seconds()<<std::endl;
         
         printf("Transposing MKL output: ");
         sparse_matrix_t *mkl_out = (sparse_matrix_t *) malloc( sizeof(sparse_matrix_t) );
@@ -226,7 +233,7 @@ int main(){
         auto SpAddHash_rowIds = SpAddHash_out.get_rowIds();
         auto SpAddHash_nzVals = SpAddHash_out.get_nzVals();
 
-        printf("SpAddHash vs MKL Output Comparison\n");
+        printf("SpAdd vs MKL Output Comparison\n");
         printf("==================================\n");
         printf("Number of columns: %ld vs %ld\n", SpAddHash_colPtr->size()-1, out_ncols);
 
@@ -265,6 +272,7 @@ int main(){
         for (int i = 0; i < k; i++){
            if(mkl_sums[i] != NULL) mkl_sparse_destroy(mkl_sums[i]);
         }
+        std::cout << std::endl;
     }
 
     for (int i = 0; i < k; i++){
