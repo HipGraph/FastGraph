@@ -205,7 +205,7 @@ void COO<RIT, CIT, VT>::GenER(int scale, int d, bool isWeighted, int64_t kRandSe
         }
     }
     t.Stop();
-    PrintTime("ER Generation Time", t.Seconds());
+    //PrintTime("ER Generation Time", t.Seconds());
 }
 
 
