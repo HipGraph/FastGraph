@@ -67,11 +67,14 @@ static void ParallelPrefixSum(const pvector<T> &degrees, pvector<SUMT>& prefix)
 }
 
 /*
- *  Prints mean and variance of an array
- *  Not parallelized, parallelize if needed
+ *  Gets minimum, maximum, mean and variance of an array
+ *  Returns a tuple with maximum value as first element,
+ *  minimum value as second elements, mean as the third
+ *  element and standard deviation as the fourth element.
+ *  Prints the stats on the screen if print flag is passed.
  * */
 template<typename T>
-static void printStats(pvector<T> &arr){
+static std::tuple<T, T, double, double> getStats(pvector<T> &arr, bool print = false){
     double mu = 0;
     double sig2 = 0;
     T max_val = arr[0];
@@ -86,11 +89,13 @@ static void printStats(pvector<T> &arr){
 #pragma omp parallel for default(shared) reduction(+: sig2)
     for(int i = 0; i < arr.size(); i++) sig2 += (mu-(double)arr[i])*(mu-(double)arr[i]);
     sig2 = sig2 / arr.size();
-    std::cout << "\t[printStats] Max:" << max_val << std::endl;
-    std::cout << "\t[printStats] Min:" << min_val << std::endl;
-    std::cout << "\t[printStats] Mean:" << mu << std::endl;
-    std::cout << "\t[printStats] Std-Dev:" << sqrt(sig2) << std::endl;
-    return;
+    if(print){
+        std::cout << "\t[getStats] Max:" << max_val << std::endl;
+        std::cout << "\t[getStats] Min:" << min_val << std::endl;
+        std::cout << "\t[getStats] Mean:" << mu << std::endl;
+        std::cout << "\t[getStats] Std-Dev:" << sqrt(sig2) << std::endl;
+    }
+    return std::make_tuple(max_val, min_val, mu, sqrt(sig2));
 }
 
 

@@ -226,7 +226,7 @@ CSC<RIT, VT, CPT>::CSC(COO<RIT, CIT, VT> & cooMat)
 	MergeDuplicateSort(std::plus<VT>());
 	isColSorted_ = true;
 	t.Stop();
-	PrintTime("CSC Creation Time", t.Seconds());
+	//PrintTime("CSC Creation Time", t.Seconds());
 }
 
 

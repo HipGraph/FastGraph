@@ -18,7 +18,7 @@ int main(){
     int y = 8;  // average degree of random matrix
 	bool weighted = true;
 
-	int k = 2;// number of matrices
+	int k = 100;// number of matrices
 
 	std::vector< CSC<int32_t, int32_t, int32_t>* > vec;
 
@@ -127,10 +127,9 @@ int main(){
     printf("\n");
 
 
-    int threads[5] = {1, 6, 12, 24, 48};
-    //int threads[1] = {2};
+    std::vector<int> threads{1, 6, 12, 24, 48};
 
-    for(int i = 0; i < 5; i++){
+    for(int i = 0; i < threads.size(); i++){
         omp_set_num_threads(threads[i]);
         mkl_set_num_threads(threads[i]);
         std::cout << ">>> Using " << threads[i] << " threads" << std::endl;
@@ -171,16 +170,19 @@ int main(){
         clock.Stop();
         std::cout << "time for MKL in seconds " << clock.Seconds() << std::endl;
 
-
         clock.Start();
         CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpAdd<int32_t,int32_t, int32_t,int32_t> (vec[0], vec[1]);
+        for (int i = 2; i < k; i++){
+            SpAddHash_out = SpAdd<int32_t,int32_t,int32_t,int32_t>(&SpAddHash_out, vec[i]);
+        }
         clock.Stop();
         std::cout<<"time for SpAdd function in seconds = "<< clock.Seconds()<<std::endl;
-
-        //clock.Start();
-        //CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpMultiAddHash<int32_t,int32_t, int32_t,int32_t> (vec);
-        //clock.Stop();
-        //std::cout<<"time for SpMultiAddHash function in seconds = "<< clock.Seconds()<<std::endl;
+        
+        clock.Start(); 
+        //CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec);
+        SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec);
+        clock.Stop();
+        std::cout<<"time for SpMultiAdd function in seconds = "<< clock.Seconds()<<std::endl;
         
         printf("Transposing MKL output: ");
         sparse_matrix_t *mkl_out = (sparse_matrix_t *) malloc( sizeof(sparse_matrix_t) );
