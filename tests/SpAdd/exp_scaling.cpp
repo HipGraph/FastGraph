@@ -25,8 +25,8 @@ int main(){
     // below is method to use random matrices from COO.h
     for(int i = 0; i < k; i++){
         COO<int32_t, int32_t, int32_t> coo;
-        //coo.GenER(x,y,weighted, 2022021);   //(x,y,true) Generate a weighted ER matrix with 2^x rows and columns and y nonzeros per column
-        coo.GenRMAT(x,y,weighted, 2022021);   //(x,y,true) Generate a weighted RMAT matrix with 2^x rows and columns and y nonzeros per column
+        //coo.GenER(x,y,weighted);   //(x,y,true) Generate a weighted ER matrix with 2^x rows and columns and y nonzeros per column
+        coo.GenRMAT(x,y,weighted);   //(x,y,true) Generate a weighted RMAT matrix with 2^x rows and columns and y nonzeros per column
         vec.push_back(new CSC<int32_t, int32_t, int32_t>(coo));
     }
     
@@ -128,6 +128,7 @@ int main(){
 
 
     std::vector<int> threads{1, 6, 12, 24, 48};
+    //std::vector<int> threads{ 48};
 
     for(int i = 0; i < threads.size(); i++){
         omp_set_num_threads(threads[i]);
@@ -174,15 +175,16 @@ int main(){
         CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpAdd<int32_t,int32_t, int32_t,int32_t> (vec[0], vec[1]);
         for (int i = 2; i < k; i++){
             SpAddHash_out = SpAdd<int32_t,int32_t,int32_t,int32_t>(&SpAddHash_out, vec[i]);
+            std::cout << "Nonzeros: " << SpAddHash_out.get_nnz() << std::endl;
         }
         clock.Stop();
         std::cout<<"time for SpAdd function in seconds = "<< clock.Seconds()<<std::endl;
         
-        clock.Start(); 
-        //CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec);
-        SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec);
-        clock.Stop();
-        std::cout<<"time for SpMultiAdd function in seconds = "<< clock.Seconds()<<std::endl;
+        //clock.Start(); 
+        ////CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec);
+        //SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec);
+        //clock.Stop();
+        //std::cout<<"time for SpMultiAdd function in seconds = "<< clock.Seconds()<<std::endl;
         
         printf("Transposing MKL output: ");
         sparse_matrix_t *mkl_out = (sparse_matrix_t *) malloc( sizeof(sparse_matrix_t) );
