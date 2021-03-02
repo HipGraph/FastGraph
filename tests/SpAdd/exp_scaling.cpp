@@ -180,11 +180,11 @@ int main(){
         clock.Stop();
         std::cout<<"time for SpAdd function in seconds = "<< clock.Seconds()<<std::endl;
         
-        //clock.Start(); 
-        ////CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec);
-        //SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec);
-        //clock.Stop();
-        //std::cout<<"time for SpMultiAdd function in seconds = "<< clock.Seconds()<<std::endl;
+        clock.Start(); 
+        //CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec);
+        SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec);
+        clock.Stop();
+        std::cout<<"time for SpMultiAdd function in seconds = "<< clock.Seconds()<<std::endl;
         
         printf("Transposing MKL output: ");
         sparse_matrix_t *mkl_out = (sparse_matrix_t *) malloc( sizeof(sparse_matrix_t) );
