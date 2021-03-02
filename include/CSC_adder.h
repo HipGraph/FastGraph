@@ -319,7 +319,7 @@ pvector<RIT> symbolicSpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > &vec_of_mat
     NM number_of_matrices = vec_of_matrices.size();
  
     //std::ofstream fp;
-    //fp.open("nnz_per_column.txt", std::ios::out);
+    //fp.open("nnz_per_column.txt", std::ios::trunc);
 
 #pragma omp parallel
     {
@@ -386,21 +386,18 @@ pvector<RIT> symbolicSpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > &vec_of_mat
             
         }
         //nz_per_column[i] = umap.size();
-        //fp << nz_per_column[i] << std::endl;
     } 
     }
+    // parallel programming ended
     //for (int i = 0 ; i < nz_per_column.size(); i++){
         //fp << nz_per_column[i] << std::endl;
     //}
     //fp.close();
-    // parallel programming ended
     return std::move(nz_per_column);
     
 }
 
 //..........................................................................//
-
-
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
 CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pvector<RIT> & nnzPerCol, bool sorted=true)
 {
@@ -410,6 +407,184 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pv
 
     CIT ncols = matrices[0]->get_ncols();
     RIT nrows = matrices[0]->get_nrows();
+    
+    pvector<CPT> prefix_sum(ncols+1);
+    ParallelPrefixSum(nnzPerCol, prefix_sum);
+    
+    pvector<CPT> CcolPtr(prefix_sum.begin(), prefix_sum.end());
+    pvector<RIT> CrowIds(prefix_sum[ncols]);
+    pvector<VT> CnzVals(prefix_sum[ncols]);
+
+    CSC<RIT, VT, CPT> sumMat(nrows, ncols, prefix_sum[ncols], false, true);
+    sumMat.cols_pvector(&CcolPtr);
+    
+    CPT nnzCTot = prefix_sum[ncols];
+    pvector<double> ttimes; // To record time taken by each thread
+    pvector<RIT> nnzPerThread; // To record number of nnz processed by each thread 
+    pvector<CPT> splitters; // To store load balance friendly split of columns accross threads;
+    CPT nnzCPerThreadExpected;
+    auto nnzPerColStats = getStats<RIT>(nnzPerCol);
+    int nthreads;
+
+    const RIT minHashTableSize = 16;
+    const RIT hashScale = 107;
+
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        double ttime = omp_get_wtime();
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
+            nnzCPerThreadExpected = nnzCTot / nthreads;
+            ttimes.resize(nthreads);
+            nnzPerThread.resize(nthreads);
+            splitters.resize(nthreads);
+        }
+#pragma omp barrier
+        nnzPerThread[tid] = 0;
+        std::vector< std::pair<RIT,VT>> globalHashVec(minHashTableSize);
+#pragma omp for schedule(static) nowait 
+        //for(int t = 0; t < nthreads; t++){
+            //CPT colStart = splitters[t];
+            //CPT colEnd = t < nthreads-1 ? splitters[t+1] : ncols;
+            for(CPT i = 0; i < ncols; i++){
+                //double z = (nnzPerCol[i] - std::get<2>(nnzPerColStats)) / std::get<3>(nnzPerColStats);
+                //if (z >= 1.65){
+                    //// Denser than 95% columns according to Gaussian distribution. So skip it for now.
+                    //continue;
+                //}
+                //if(nnzPerCol[i] > 1024){
+                    //continue;
+                //}
+                //----------- preparing the hash table for this column -------
+                size_t htSize = minHashTableSize;
+                while(htSize < nnzPerCol[i])
+                {
+                    htSize <<= 1;
+                }   
+                if(globalHashVec.size() < htSize)
+                    globalHashVec.resize(htSize);
+                for(size_t j=0; j < htSize; ++j)
+                {
+                    globalHashVec[j].first = -1;
+                }
+            
+                //----------- add this column form all matrices -------
+                for(int k = 0; k < nmatrices; k++)
+                {
+                    const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                    const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                    const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+                
+                    for(CPT j = (*colPtr)[i]; j < (*colPtr)[i+1]; j++)
+                    {
+                        RIT key = (*rowIds)[j];
+                        RIT hash = (key*hashScale) & (htSize-1);
+                        VT curval = (*nzVals)[j];
+                        while (1) //hash probing
+                        {
+                            if (globalHashVec[hash].first == key) //key is found in hash table
+                            {
+                                globalHashVec[hash].second += curval;
+                                break;
+                            }
+                            else if (globalHashVec[hash].first == -1) //key is not registered yet
+                            {
+                                globalHashVec[hash].first = key;
+                                globalHashVec[hash].second = curval;
+                                break;
+                            }
+                            else //key is not found
+                            {
+                                hash = (hash+1) & (htSize-1);
+                            }
+                        }   
+                    }
+                    //nnzPerThread[tid] += (*colPtr)[i+1] - (*colPtr)[i];
+                }
+           
+                if(sorted)
+                {
+                    size_t index = 0;
+                    for (size_t j=0; j < htSize; ++j)
+                    {
+                        if (globalHashVec[j].first != -1)
+                        {
+                            globalHashVec[index++] = globalHashVec[j];
+                        }
+                    }
+                
+                    // try radix sort
+                    //std::sort(globalHashVec.begin(), globalHashVec.begin() + index, sort_less<IT, NT>);
+                    std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
+                
+                
+                    for (size_t j=0; j < index; ++j)
+                    {
+                        CrowIds[prefix_sum[i]] = globalHashVec[j].first;
+                        CnzVals[prefix_sum[i]] = globalHashVec[j].second;
+                        prefix_sum[i] ++;
+                    }
+                }
+                else
+                {
+                    for (size_t j=0; j < htSize; ++j)
+                    {
+                        if (globalHashVec[j].first != -1)
+                        {
+                            CrowIds[prefix_sum[i]] = globalHashVec[j].first;
+                            CnzVals[prefix_sum[i]] = globalHashVec[j].second;
+                            prefix_sum[i] ++;
+                        }
+                    }
+                }
+            }
+        //}  // parallel programming ended
+        ttime = omp_get_wtime() - ttime;
+        ttimes[tid] = ttime;
+#pragma omp barrier
+    }
+
+    t1 = omp_get_wtime();
+
+    //printf("[SpMultiAddHash] Time taken for parallel section %lf\n", (t1-t0));
+
+    //printf("[SpMultiAddHash] Stats of time consumed by threads\n");
+    //getStats<double>(ttimes, true);
+
+    //printf("[SpMultiAddHash] Stats of nnz processed by threads\n");
+    //getStats<RIT>(nnzPerThread, true);
+
+    Timer clock;
+    clock.Start();
+
+    sumMat.nz_rows_pvector(&CrowIds);
+    sumMat.nz_vals_pvector(&CnzVals);
+
+    clock.Stop();
+    return std::move(sumMat);
+}
+
+
+template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
+CSC<RIT, VT, CPT> SpMultiAddHashBalanced(std::vector<CSC<RIT, VT, CPT>* > & matrices, pvector<RIT> & nnzPerCol, bool sorted=true)
+{
+    double t0, t1, t2, t3;
+    int nmatrices = matrices.size();
+    
+
+    CIT ncols = matrices[0]->get_ncols();
+    RIT nrows = matrices[0]->get_nrows();
+    //t0 = omp_get_wtime();
+//#pragma omp parallel for
+    //for (CPT i = 0; i < ncols; i++){
+        //if(nnzPerCol[i] > 1024){
+            //nnzPerCol[i] = 0;
+        //}
+    //}
+    //t1 = omp_get_wtime();
+    //printf("Time for skip calculation %lf\n", t1-t0);
     
     pvector<CPT> prefix_sum(ncols+1);
     ParallelPrefixSum(nnzPerCol, prefix_sum);
@@ -459,6 +634,10 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pv
                     //// Denser than 95% columns according to Gaussian distribution. So skip it for now.
                     //continue;
                 //}
+                //if (nnzPerCol[i] > 1024) {
+                    //continue;
+                //}
+                if(nnzPerCol[i] != 0){
                 //----------- preparing the hash table for this column -------
                 size_t htSize = minHashTableSize;
                 while(htSize < nnzPerCol[i])
@@ -503,7 +682,7 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pv
                             }
                         }   
                     }
-                    nnzPerThread[tid] += (*colPtr)[i+1] - (*colPtr)[i];
+                    //nnzPerThread[tid] += (*colPtr)[i+1] - (*colPtr)[i]; // Would cause false sharing
                 }
            
                 if(sorted)
@@ -541,6 +720,7 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pv
                         }
                     }
                 }
+                }
             }
         }  // parallel programming ended
         ttime = omp_get_wtime() - ttime;
@@ -552,11 +732,11 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pv
 
     //printf("[SpMultiAddHash] Time taken for parallel section %lf\n", (t1-t0));
 
-    printf("[SpMultiAddHash] Stats of time consumed by threads\n");
-    getStats<double>(ttimes, true);
+    //printf("[SpMultiAddHash] Stats of time consumed by threads\n");
+    //getStats<double>(ttimes, true);
 
-    printf("[SpMultiAddHash] Stats of nnz processed by threads\n");
-    getStats<RIT>(nnzPerThread, true);
+    //printf("[SpMultiAddHash] Stats of nnz processed by threads\n");
+    //getStats<RIT>(nnzPerThread, true);
 
     Timer clock;
     clock.Start();
@@ -767,7 +947,7 @@ CSC<RIT, VT, CPT> SpAddRegular(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, pvect
                         }
                     }
                 }
-                nnzPerThread[tid] += (ArowsEnd - ArowsStart) + (BrowsEnd - BrowsStart);
+                //nnzPerThread[tid] += (ArowsEnd - ArowsStart) + (BrowsEnd - BrowsStart);
             }
         }
         ttime = omp_get_wtime() - ttime;
@@ -882,7 +1062,7 @@ CSC<RIT, VT, CPT> SpMultiAdd(std::vector<CSC<RIT, VT, CPT>* > & matrices, bool i
 
     if(inputSorted){
         // Use SpAddRegular
-        return SpMultiAddHash<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, false);
+        return SpMultiAddHashBalanced<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, false);
     }
     else{
         // To Do: Probably using SpAddHash would be better      
