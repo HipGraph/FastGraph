@@ -322,7 +322,7 @@ void COO<RIT, CIT, VT>::GenRMAT(int scale, int d, bool isWeighted, int64_t kRand
     }
 
     t.Stop();
-    PrintTime("RMAT Generation Time", t.Seconds());
+    //PrintTime("RMAT Generation Time", t.Seconds());
 }
 
 
