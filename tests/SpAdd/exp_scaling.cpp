@@ -140,8 +140,7 @@ int main(int argc, char* argv[]){
 
     //std::vector<int> threads{1, 6, 12, 24, 48};
     //std::vector<int> threads{1, 16, 48};
-    std::vector<int> threads{1, 16, 48};
-    //std::vector<int> threads{16};
+    std::vector<int> threads{48};
 
     for(int i = 0; i < threads.size(); i++){
         omp_set_num_threads(threads[i]);
@@ -228,41 +227,57 @@ int main(int argc, char* argv[]){
         ////fp.close();
         ////SpAddHash_out.print_all();
         
-        clock.Start(); 
-        SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,0);
-        clock.Stop();
-        if(type == 0){
-            std::cout << "ER" << "," ;
-        }
-        else{
-            std::cout << "RMAT" << "," ;
-        }
-        std::cout << x << "," ;
-        std::cout << y << "," ;
-        std::cout << k << "," ;
-        std::cout << threads[i] << ",";
-        std::cout << "SpMultiAddHash" << ","; 
-        std::cout << clock.Seconds() << std::endl;
-        //SpAddHash_out.print_all();
+        //clock.Start(); 
+        //SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,0);
+        //clock.Stop();
+        //if(type == 0){
+            //std::cout << "ER" << "," ;
+        //}
+        //else{
+            //std::cout << "RMAT" << "," ;
+        //}
+        //std::cout << x << "," ;
+        //std::cout << y << "," ;
+        //std::cout << k << "," ;
+        //std::cout << threads[i] << ",";
+        //std::cout << "SpMultiAddHash" << ","; 
+        //std::cout << clock.Seconds() << std::endl;
+        ////SpAddHash_out.print_all();
         
-        clock.Start(); 
-        SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,1);
-        clock.Stop();
-        if(type == 0){
-            std::cout << "ER" << "," ;
-        }
-        else{
-            std::cout << "RMAT" << "," ;
-        }
-        std::cout << x << "," ;
-        std::cout << y << "," ;
-        std::cout << k << "," ;
-        std::cout << threads[i] << ",";
-        std::cout << "SpMultiAddHybrid" << ","; 
-        std::cout << clock.Seconds() << std::endl;
+        //clock.Start(); 
+        //SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,1);
+        //clock.Stop();
+        //if(type == 0){
+            //std::cout << "ER" << "," ;
+        //}
+        //else{
+            //std::cout << "RMAT" << "," ;
+        //}
+        //std::cout << x << "," ;
+        //std::cout << y << "," ;
+        //std::cout << k << "," ;
+        //std::cout << threads[i] << ",";
+        //std::cout << "SpMultiAddHybrid" << ","; 
+        //std::cout << clock.Seconds() << std::endl;
+
+        //clock.Start(); 
+        //SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,2);
+        //clock.Stop();
+        //if(type == 0){
+            //std::cout << "ER" << "," ;
+        //}
+        //else{
+            //std::cout << "RMAT" << "," ;
+        //}
+        //std::cout << x << "," ;
+        //std::cout << y << "," ;
+        //std::cout << k << "," ;
+        //std::cout << threads[i] << ",";
+        //std::cout << "SpMultiAddHybrid2" << ","; 
+        //std::cout << clock.Seconds() << std::endl;
 
         clock.Start(); 
-        SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,2);
+        SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,3);
         clock.Stop();
         if(type == 0){
             std::cout << "ER" << "," ;
@@ -274,7 +289,7 @@ int main(int argc, char* argv[]){
         std::cout << y << "," ;
         std::cout << k << "," ;
         std::cout << threads[i] << ",";
-        std::cout << "SpMultiAddHybrid2" << ","; 
+        std::cout << "SpMultiAddHybrid3" << ","; 
         std::cout << clock.Seconds() << std::endl;
         
         //printf("Transposing MKL output: ");
