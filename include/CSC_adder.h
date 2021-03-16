@@ -912,11 +912,8 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid2(std::vector<CSC<RIT, VT, CPT>* > & matrices,
                 // For the matrix having densest pattern at current column, determine the range of row indices for current thread
                 CPT colStartDense = (*colPtrDense)[i]; // Get index in the row pointer array of the matrix from where current column starts
                 CPT colEndDense = (*colPtrDense)[i+1]; // Get index in the row pointer array of the matrix from where next column starts if there is any
-                //RIT rowIdsDenseThreadStartIdx = (colStartDense + tid * nnzPerThreadDense) < colEndDense ? (colStartDense + tid * nnzPerThreadDense) : colEndDense;
                 RIT rowIdsDenseThreadStartIdx = (colStartDense + tid * nnzPerThreadDense);
                 RIT rowIdsDenseThreadEndIdx = (tid < nthreads-1) ? (colStartDense + (tid+1) * nnzPerThreadDense) : colEndDense;
-                //RIT rowStartDense = (tid == 0) ? 0 : (*rowIdsDense)[rowIdsDenseThreadStartIdx];
-                //RIT rowEndDense = (tid < nthreads-1) ? (*rowIdsDense)[rowIdsDenseThreadEndIdx] : nrows;
                 RIT rowStartDense = 0;
                 RIT rowEndDense = nrows;
                 if (tid > 0){
@@ -996,7 +993,8 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid3(std::vector<CSC<RIT, VT, CPT>* > & matrices,
 {
     double t0, t1, t2, t3, t4, t5;
     int nmatrices = matrices.size();
-    int windowSize = 2048;
+    int densityThreshold = 2 * 1024;
+    int windowSize = 2 * 1024;
     int nthreads;
     CIT ncols = matrices[0]->get_ncols();
     RIT nrows = matrices[0]->get_nrows();
@@ -1004,7 +1002,7 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid3(std::vector<CSC<RIT, VT, CPT>* > & matrices,
     pvector<RIT> nnzPerColDense(nnzPerCol.begin(), nnzPerCol.end());
 #pragma omp parallel for
     for (CPT i = 0; i < ncols; i++){
-        if(nnzPerCol[i] > windowSize){
+        if(nnzPerCol[i] > densityThreshold){
             nnzPerColSparse[i] = 0;
         }
         else{
@@ -1037,13 +1035,12 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid3(std::vector<CSC<RIT, VT, CPT>* > & matrices,
 
     const RIT minHashTableSize = 16;
     const RIT hashScale = 107;
-    std::vector< std::pair<RIT,VT> > spa(nrows);
-    std::vector< std::vector <std::pair<RIT,VT> > > denseOutputPerThread;
-
+    pvector< std::pair<bool,VT> > spa(nrows);
+    pvector< std::vector <std::pair<RIT,VT> > > denseOutputPerThread;
+    
     t0 = omp_get_wtime();
 #pragma omp parallel
     {
-        double ttime = omp_get_wtime();
         int tid = omp_get_thread_num();
         if(tid == 0){
             nthreads = omp_get_num_threads();
@@ -1054,16 +1051,26 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid3(std::vector<CSC<RIT, VT, CPT>* > & matrices,
             splitters.resize(nthreads);
             denseOutputPerThread.resize(nthreads);
         }
+    }
+    t1 = omp_get_wtime();
+    printf("Time for checkpoint 1: %lf\n", t1-t0);
+
+    RIT colProcessed = 0;
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        double ttime = omp_get_wtime();
+        int tid = omp_get_thread_num();
         std::vector< std::pair<RIT,VT> > globalHashVec(minHashTableSize);
-#pragma omp barrier
         splitters[tid] = std::lower_bound(prefixSumSparse.begin(), prefixSumSparse.end(), tid * nnzCPerThreadSparseExpected) - prefixSumSparse.begin();
 #pragma omp barrier
-#pragma omp for schedule(static) nowait 
+#pragma omp for reduction(+: colProcessed) schedule(static) nowait
         for(int t = 0; t < nthreads; t++){
             CPT colStart = splitters[t];
             CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
             for(CPT i = colStart; i < colEnd; i++){
-                if(nnzPerCol[i] != 0 && nnzPerCol[i] <= windowSize){
+                if(nnzPerCol[i] <= densityThreshold){
+                    colProcessed++;
                     //----------- preparing the hash table for this column -------
                     size_t htSize = minHashTableSize;
                     while(htSize < nnzPerCol[i]){
@@ -1122,12 +1129,26 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid3(std::vector<CSC<RIT, VT, CPT>* > & matrices,
                 }
             }
         }
-
-        // Rows of each previously skipped columns will be split between threads
-        //for (CPT x = 0; x < ncols; i++){
+        ttime = omp_get_wtime() - ttime;
+        ttimes[tid] = ttime;
+#pragma omp barrier
+    }
+    t1 = omp_get_wtime();
+    printf("Processed sparse columns %d\n", colProcessed);
+    printf("Time for checkpoint 2: %lf\n", t1-t0);
+    printf("Stats of sparse portion:\n");
+    getStats<double>(ttimes, true);
+    
+    colProcessed = 0;
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        double ttime = omp_get_wtime();
+        int tid = omp_get_thread_num();
         for(CPT i = 0; i < ncols; i++){
-            if(nnzPerCol[i] > windowSize){
-                denseOutputPerThread[tid].clear();
+            if(nnzPerCol[i] > densityThreshold){
+                if(tid == 0) colProcessed++;
+                //denseOutputPerThread[tid].clear();
                 RIT nRowsPerThread = nrows / nthreads;
                 RIT rowStart = tid * nRowsPerThread;
                 RIT rowEnd = (tid == nthreads-1) ? nrows : (tid+1) * nRowsPerThread;
@@ -1142,10 +1163,8 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid3(std::vector<CSC<RIT, VT, CPT>* > & matrices,
                 while(rowStart < rowEnd){
                     RIT windowStart = rowStart;
                     RIT windowEnd = std::min(windowStart + windowSize, rowEnd);
-
-                    for (RIT j = windowStart; j < windowEnd; j++) spa[j].first = -1;
+                    for (RIT j = windowStart; j < windowEnd; j++) spa[j].first = false;
                 
-                    RIT nnzProcessedInRange = 0;
                     for (int k = 0; k < nmatrices; k++){
                         const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
                         const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
@@ -1153,40 +1172,37 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid3(std::vector<CSC<RIT, VT, CPT>* > & matrices,
                         for (RIT j = rowRanges[k].first; j < rowRanges[k].second; j++){
                             RIT rowId = (*rowIds)[j];
                             VT value = (*nzVals)[j];
-                            if(rowId >= windowEnd){
+                            if( rowId >= windowEnd ) {
                                 rowRanges[k].first = j;
                                 break;
                             }
                             else{
-                                if (spa[rowId].first == -1){
-                                    spa[rowId].first = rowId;
+                                if (spa[rowId].first == false){
+                                    spa[rowId].first = true;
                                     spa[rowId].second = value;
-                                    nnzProcessedInRange++;
                                 }
                                 else{
                                     spa[rowId].second += value;
                                 }
+
+                                if(j == rowRanges[k].second - 1){
+                                    rowRanges[k].first = rowRanges[k].second;
+                                }
                             }
                         }
                     }
-                    for(RIT j = windowStart; j < windowEnd; j++){
-                        if(spa[j].first != -1) denseOutputPerThread[tid].push_back(spa[j]);
-                    }
+                    //for(RIT j = windowStart; j < windowEnd; j++){
+                        //if(spa[j].first != false) denseOutputPerThread[tid].push_back(std::pair<RIT,VT>(j,spa[j].second));
+                    //}
                     rowStart += windowSize;
                 }
 
-#pragma omp barrier
-                // Wait until all threads are done for this column
-                // Copy contents to output using only one thread
-                if(tid == 0){
-                    for(int t = 0; t < nthreads; t++){
-                        for(RIT index = 0; index < denseOutputPerThread[t].size(); index++){
-                            CrowIds[prefixSum[i]] = denseOutputPerThread[t][index].first;
-                            CnzVals[prefixSum[i]] = denseOutputPerThread[t][index].second;
-                            prefixSum[i]++;
-                        }
-                    }
-                }
+//#pragma omp barrier
+                //RIT offset = (tid == 0) ? 0 : denseOutputPerThread[tid-1].size();
+                //for(RIT idx = 0; idx < denseOutputPerThread[tid].size(); idx++){
+                    //CrowIds[prefixSum[i] + offset + idx] = denseOutputPerThread[tid][idx].first;
+                    //CnzVals[prefixSum[i] + offset + idx] = denseOutputPerThread[tid][idx].second;
+                //}
             }
         }
         ttime = omp_get_wtime() - ttime;
@@ -1194,10 +1210,13 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid3(std::vector<CSC<RIT, VT, CPT>* > & matrices,
 #pragma omp barrier
     }
     t1 = omp_get_wtime();
+    printf("Processed dense columns %d\n", colProcessed);
+    printf("Time for checkpoint 3: %lf\n", t1-t0);
+    printf("Stats of dense portion:\n");
+    getStats<double>(ttimes, true);
 
     sumMat.nz_rows_pvector(&CrowIds);
     sumMat.nz_vals_pvector(&CnzVals);
-
     return std::move(sumMat);
 }
 
@@ -1303,6 +1322,125 @@ CSC<RIT, VT, CPT> SpMultiAddSpA(std::vector<CSC<RIT, VT, CPT>* > & matrices, pve
     sumMat.nz_vals_pvector(&CnzVals);
 
     clock.Stop();
+    return std::move(sumMat);
+}
+
+template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
+CSC<RIT, VT, CPT> SpMultiAddSpA2(std::vector<CSC<RIT, VT, CPT>* > & matrices, pvector<RIT> & nnzPerCol, bool sorted=true)
+{
+    double t0, t1, t2, t3, t4, t5;
+    int nmatrices = matrices.size();
+    int nthreads;
+    CIT ncols = matrices[0]->get_ncols();
+    RIT nrows = matrices[0]->get_nrows();
+    
+    pvector<CPT> prefixSum(ncols+1);
+    ParallelPrefixSum(nnzPerCol, prefixSum);
+    
+    pvector<CPT> CcolPtr(prefixSum.begin(), prefixSum.end());
+    pvector<RIT> CrowIds(prefixSum[ncols]);
+    pvector<VT> CnzVals(prefixSum[ncols]);
+
+    CSC<RIT, VT, CPT> sumMat(nrows, ncols, prefixSum[ncols], false, true);
+    sumMat.cols_pvector(&CcolPtr);
+    
+    CPT nnzCTot = prefixSum[ncols];
+    pvector<double> ttimes; // To record time taken by each thread
+
+    std::vector< std::pair<bool,VT> > spa(nrows);
+    pvector< std::vector <std::pair<RIT,VT> > > denseOutputPerThread;
+    
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
+            ttimes.resize(nthreads);
+            denseOutputPerThread.resize(nthreads);
+        }
+    }
+    t1 = omp_get_wtime();
+    printf("Time for checkpoint 1: %lf\n", t1-t0);
+    
+    //int windowSize = 128*1024;
+    int windowSize = 2;
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        double ttime = omp_get_wtime();
+        int tid = omp_get_thread_num();
+        for(CPT i = 0; i < ncols; i++){
+            if(nnzPerCol[i] > 0){
+                denseOutputPerThread[tid].clear();
+                RIT nRowsPerThread = nrows / nthreads;
+                RIT rowStart = tid * nRowsPerThread;
+                RIT rowEnd = (tid == nthreads-1) ? nrows : (tid+1) * nRowsPerThread;
+                pvector< std::pair<RIT,RIT> > rowRanges(nmatrices); 
+                for(int k = 0; k < nmatrices; k++){
+                    const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                    const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                    const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+                    rowRanges[k].first = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart ) - rowIds->begin();
+                    rowRanges[k].second = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd ) - rowIds->begin();
+                }
+                while(rowStart < rowEnd){
+                    RIT windowStart = rowStart;
+                    RIT windowEnd = std::min(windowStart + windowSize, rowEnd);
+                    for (RIT j = windowStart; j < windowEnd; j++) spa[j].first = false;
+                
+                    for (int k = 0; k < nmatrices; k++){
+                        const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                        const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                        const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+                        for (RIT j = rowRanges[k].first; j < rowRanges[k].second; j++){
+                            RIT rowId = (*rowIds)[j];
+                            VT value = (*nzVals)[j];
+                            if( rowId >= windowEnd ) {
+                                rowRanges[k].first = j;
+                                break;
+                            }
+                            else{
+                                if (spa[rowId].first == false){
+                                    spa[rowId].first = true;
+                                    spa[rowId].second = value;
+                                }
+                                else{
+                                    spa[rowId].second += value;
+                                }
+
+                                if(j == rowRanges[k].second - 1){
+                                    rowRanges[k].first = rowRanges[k].second;
+                                }
+                            }
+                        }
+                    }
+                    for(RIT j = windowStart; j < windowEnd; j++){
+                        if(spa[j].first != false) denseOutputPerThread[tid].push_back(std::pair<RIT,VT>(j,spa[j].second));
+                    }
+                    rowStart += windowSize;
+                }
+
+#pragma omp barrier
+                RIT offset = (tid == 0) ? 0 : denseOutputPerThread[tid-1].size();
+                for(RIT idx = 0; idx < denseOutputPerThread[tid].size(); idx++){
+                    CrowIds[prefixSum[i] + offset + idx] = denseOutputPerThread[tid][idx].first;
+                    CnzVals[prefixSum[i] + offset + idx] = denseOutputPerThread[tid][idx].second;
+                }
+            }
+        }
+        ttime = omp_get_wtime() - ttime;
+        ttimes[tid] = ttime;
+#pragma omp barrier
+    }
+    t1 = omp_get_wtime();
+    //printf("Time for checkpoint 3: %lf\n", t1-t0);
+    printf("Stats of dense portion:\n");
+    getStats<double>(ttimes, true);
+
+    sumMat.nz_rows_pvector(&CrowIds);
+    sumMat.nz_vals_pvector(&CnzVals);
+
     return std::move(sumMat);
 }
 
@@ -1581,6 +1719,7 @@ CSC<RIT, VT, CPT> SpAdd(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, bool inputSo
  *  Takes a vector of CSC matrices as input
  *  Checks different criteria to decide which implementation to use
  *  Returns another CSC matrix
+ *
  * */
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
 CSC<RIT, VT, CPT> SpMultiAdd(std::vector<CSC<RIT, VT, CPT>* > & matrices, int version, bool inputSorted=true, bool outputSorted=true){
@@ -1605,11 +1744,13 @@ CSC<RIT, VT, CPT> SpMultiAdd(std::vector<CSC<RIT, VT, CPT>* > & matrices, int ve
     t0 = omp_get_wtime();
     pvector<RIT> nnzCPerCol = symbolicSpMultiAddHash<RIT, CIT, VT, CPT, int32_t>(matrices);
     t1 = omp_get_wtime();
+    printf("Time for symbolic: %lf\n", t1-t0);
     
     if(version == 0) return SpMultiAddHash<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
     else if(version == 1) return SpMultiAddHybrid<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
     else if(version == 2) return SpMultiAddHybrid2<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
     else if(version == 3) return SpMultiAddHybrid3<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
+    else return SpMultiAddHybrid3<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
     
     //return SpMultiAddSpA3<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
 }
