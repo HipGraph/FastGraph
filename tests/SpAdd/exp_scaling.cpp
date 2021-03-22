@@ -227,22 +227,22 @@ int main(int argc, char* argv[]){
         ////fp.close();
         ////SpAddHash_out.print_all();
         
-        //clock.Start(); 
-        //SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,0);
-        //clock.Stop();
-        //if(type == 0){
-            //std::cout << "ER" << "," ;
-        //}
-        //else{
-            //std::cout << "RMAT" << "," ;
-        //}
-        //std::cout << x << "," ;
-        //std::cout << y << "," ;
-        //std::cout << k << "," ;
-        //std::cout << threads[i] << ",";
-        //std::cout << "SpMultiAddHash" << ","; 
-        //std::cout << clock.Seconds() << std::endl;
-        ////SpAddHash_out.print_all();
+        clock.Start(); 
+        SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,0);
+        clock.Stop();
+        if(type == 0){
+            std::cout << "ER" << "," ;
+        }
+        else{
+            std::cout << "RMAT" << "," ;
+        }
+        std::cout << x << "," ;
+        std::cout << y << "," ;
+        std::cout << k << "," ;
+        std::cout << threads[i] << ",";
+        std::cout << "SpMultiAddHash" << ","; 
+        std::cout << clock.Seconds() << std::endl;
+        //SpAddHash_out.print_all();
         
         //clock.Start(); 
         //SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,1);
@@ -277,7 +277,8 @@ int main(int argc, char* argv[]){
         //std::cout << clock.Seconds() << std::endl;
 
         clock.Start(); 
-        SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,3);
+        //SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,0);
+        CSC<int32_t, int32_t, int32_t> SpAddHybrid_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,4);
         clock.Stop();
         if(type == 0){
             std::cout << "ER" << "," ;
@@ -289,8 +290,48 @@ int main(int argc, char* argv[]){
         std::cout << y << "," ;
         std::cout << k << "," ;
         std::cout << threads[i] << ",";
-        std::cout << "SpMultiAddHybrid3" << ","; 
+        std::cout << "SpMultiAddHashSliding" << ","; 
         std::cout << clock.Seconds() << std::endl;
+
+        //auto SpAddHash_colPtr = SpAddHash_out.get_colPtr();
+        //auto SpAddHash_rowIds = SpAddHash_out.get_rowIds();
+        //auto SpAddHash_nzVals = SpAddHash_out.get_nzVals();
+        //auto SpAddHash_ncols = SpAddHash_out.get_ncols();
+        //auto SpAddHash_nrows = SpAddHash_out.get_nrows();
+        //auto SpAddHybrid_colPtr = SpAddHybrid_out.get_colPtr();
+        //auto SpAddHybrid_rowIds = SpAddHybrid_out.get_rowIds();
+        //auto SpAddHybrid_nzVals = SpAddHybrid_out.get_nzVals();
+        //auto SpAddHybrid_ncols = SpAddHybrid_out.get_ncols();
+        //auto SpAddHybrid_nrows = SpAddHybrid_out.get_nrows();
+        //if(SpAddHash_ncols == SpAddHybrid_ncols){
+            //bool flag = true;
+            //for(int32_t i = 0; i < SpAddHash_colPtr->size(); i++){
+                //if((*SpAddHash_colPtr)[i] != (*SpAddHybrid_colPtr)[i]){
+                    //printf("colPtr[%d]\tHash: %d - Hybrid: %d\n", i, (*SpAddHash_colPtr)[i], (*SpAddHybrid_colPtr)[i]);
+                    //flag = false;
+                //}
+            //}
+            //for(int32_t j = 0; j < SpAddHash_rowIds->size(); j++){
+                //if((*SpAddHash_rowIds)[j] != (*SpAddHybrid_rowIds)[j]){
+                    //printf("rowIds[%d]\tHash: %d - Hybrid: %d\n", j, (*SpAddHash_rowIds)[j], (*SpAddHybrid_rowIds)[j]);
+                    //flag = false;
+                //}
+            //}
+            //for(int32_t j = 0; j < SpAddHash_nzVals->size(); j++){
+                //if((*SpAddHash_nzVals)[j] != (*SpAddHybrid_nzVals)[j]){
+                    //printf("nzVals[%d]\tHash: %d - Hybrid: %d\n", j, (*SpAddHash_nzVals)[j], (*SpAddHybrid_nzVals)[j]);
+                    //flag = false;
+                //}
+            //}
+            //if(flag == true){
+                //printf("Everything matched! \n");
+            //}
+        //}
+        //else{
+            //printf("Number of columns not equal!!!\nAborting further check.\n");
+        //}
+
+        
         
         //printf("Transposing MKL output: ");
         //sparse_matrix_t *mkl_out = (sparse_matrix_t *) malloc( sizeof(sparse_matrix_t) );
