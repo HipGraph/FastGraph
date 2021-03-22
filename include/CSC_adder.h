@@ -309,80 +309,119 @@ pvector<RIT> symbolic_add_vec_of_matrices(std::vector<CSC<RIT, VT, CPT>* > &vec_
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM>
 pvector<RIT> symbolicSpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > &vec_of_matrices)
 {
-    
+    double t0, t1, t2, t3;
     CIT num_of_columns = vec_of_matrices[0]->get_ncols();
+    NM number_of_matrices = vec_of_matrices.size();
     
     pvector<RIT> nz_per_column(num_of_columns);
+    pvector<RIT> flops_per_column(num_of_columns, 0);
+
+    t0 = omp_get_wtime();
+#pragma omp parallel for
+    for(CIT i = 0; i < num_of_columns; i++){
+        for(int k = 0; k < number_of_matrices; k++){
+            const pvector<CPT> *colPtr = vec_of_matrices[k]->get_colPtr();
+            flops_per_column[i] += (*colPtr)[i+1] - (*colPtr)[i];
+        }
+    }
+    t1 = omp_get_wtime();
+
+    pvector<CPT> prefix_sum(num_of_columns+1);
+    ParallelPrefixSum(flops_per_column, prefix_sum);
+    
+    CIT flops_tot = prefix_sum[num_of_columns];
+    CIT flops_per_thread_expected;
     
     const RIT minHashTableSize = 16;
     const RIT hashScale = 107;
-    NM number_of_matrices = vec_of_matrices.size();
+    int nthreads;
+    pvector<CIT> splitters;
+
+        //int tid = omp_get_thread_num();
+        //if(tid == 0){
+            //nthreads = omp_get_num_threads();
+            //ttimes.resize(nthreads);
+            //splitters.resize(nthreads);
+            //flopsPerThreadExpected = flopsTot / nthreads;
+        //}
+//#pragma omp barrier
+        //splitters[tid] = std::lower_bound(prefixSum.begin(), prefixSum.end(), tid * flopsPerThreadExpected) - prefixSum.begin();
+//#pragma omp barrier
+//#pragma omp for schedule(static) nowait
+        //for (int t = 0; t < nthreads; t++){
+            //CPT colStart = splitters[t];
+            //CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
+            //for(CPT i = colStart; i < colEnd; i++){
+
 #pragma omp parallel
     {
         std::vector<RIT> globalHashVec(minHashTableSize);
-#pragma omp for
-    for(CIT i = 0; i < num_of_columns; i++)
-    {
-        
-        nz_per_column[i] = 0;
-        size_t nnzcol = 0;
-        for(NM k = 0; k < number_of_matrices; k++)
-        {
-            nnzcol += (vec_of_matrices[k]->get_colPtr(i+1) - vec_of_matrices[k]->get_colPtr(i));
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
+            splitters.resize(nthreads);
+            flops_per_thread_expected = flops_tot / nthreads;
         }
-            
-        size_t htSize = minHashTableSize;
-        while(htSize < nnzcol) //htSize is set as 2^n
-        {
-            htSize <<= 1;
-        }
-        if(globalHashVec.size() < htSize)
-            globalHashVec.resize(htSize);
-        for(size_t j=0; j < htSize; ++j)
-        {
-            globalHashVec[j] = -1;
-        }
-        
-        for(NM k = 0; k < number_of_matrices; k++)
-        {
-            const pvector<CPT> *col_ptr_i = vec_of_matrices[k]->get_colPtr();
-            const pvector<RIT> *row_ids_i = vec_of_matrices[k]->get_rowIds();
-            for(CPT j = (*col_ptr_i)[i]; j < (*col_ptr_i)[i+1]; j++)
+#pragma omp barrier
+        splitters[tid] = std::lower_bound(prefix_sum.begin(), prefix_sum.end(), tid * flops_per_thread_expected) - prefix_sum.begin();
+#pragma omp barrier
+#pragma omp for schedule(static) nowait
+        for (int t = 0; t < nthreads; t++) {
+            CIT colStart = splitters[t];
+            CIT colEnd = (t < nthreads-1) ? splitters[t+1] : num_of_columns;
+            for(CIT i = colStart; i < colEnd; i++)
             {
                 
-                RIT key = (*row_ids_i)[j];
-                RIT hash = (key*hashScale) & (htSize-1);
-                while (1) //hash probing
+                nz_per_column[i] = 0;
+                size_t nnzcol = 0;
+                for(NM k = 0; k < number_of_matrices; k++)
                 {
+                    nnzcol += (vec_of_matrices[k]->get_colPtr(i+1) - vec_of_matrices[k]->get_colPtr(i));
+                }
                     
-                    if (globalHashVec[hash] == key) //key is found in hash table
+                size_t htSize = minHashTableSize;
+                while(htSize < nnzcol) //htSize is set as 2^n
+                {
+                    htSize <<= 1;
+                }
+                if(globalHashVec.size() < htSize)
+                    globalHashVec.resize(htSize);
+                for(size_t j=0; j < htSize; ++j)
+                {
+                    globalHashVec[j] = -1;
+                }
+                
+                for(NM k = 0; k < number_of_matrices; k++)
+                {
+                    const pvector<CPT> *col_ptr_i = vec_of_matrices[k]->get_colPtr();
+                    const pvector<RIT> *row_ids_i = vec_of_matrices[k]->get_rowIds();
+                    for(CPT j = (*col_ptr_i)[i]; j < (*col_ptr_i)[i+1]; j++)
                     {
-                        break;
-                    }
-                    else if (globalHashVec[hash] == -1) //key is not registered yet
-                    {
-                        globalHashVec[hash] = key;
-                        nz_per_column[i] ++;
-                        break;
-                    }
-                    else //key is not found
-                    {
-                        hash = (hash+1) & (htSize-1);
+                        
+                        RIT key = (*row_ids_i)[j];
+                        RIT hash = (key*hashScale) & (htSize-1);
+                        while (1) //hash probing
+                        {
+                            
+                            if (globalHashVec[hash] == key) //key is found in hash table
+                            {
+                                break;
+                            }
+                            else if (globalHashVec[hash] == -1) //key is not registered yet
+                            {
+                                globalHashVec[hash] = key;
+                                nz_per_column[i] ++;
+                                break;
+                            }
+                            else //key is not found
+                            {
+                                hash = (hash+1) & (htSize-1);
+                            }
+                        }
                     }
                 }
-                //curptr[i]++;
-                //umap[(*row_ids_i)[j] ] ++;
             }
-            
-//            col_ptr_i = nullptr;
-//            row_ids_i = nullptr;
-//
-//            delete col_ptr_i;
-//            delete row_ids_i;
-            
         }
-        //nz_per_column[i] = umap.size();
-    } 
     }
     // parallel programming ended
     //for (int i = 0 ; i < nz_per_column.size(); i++){
@@ -403,7 +442,7 @@ pvector<RIT> symbolicSpMultiAddHashSliding1(std::vector<CSC<RIT, VT, CPT>* > &ve
     pvector<RIT> nz_per_column(num_of_columns);
     RIT nrows = vec_of_matrices[0]->get_nrows();
     const RIT minHashTableSize = 16;
-    const RIT maxHashTableSize = 1024*8;
+    const RIT maxHashTableSize = 1024*2;
     const RIT hashScale = 107;
     NM number_of_matrices = vec_of_matrices.size();
 #pragma omp parallel
@@ -1505,6 +1544,390 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid3(std::vector<CSC<RIT, VT, CPT>* > & matrices,
     return std::move(sumMat);
 }
 
+/*
+ * Sliding hash
+ * */
+template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
+CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices, bool sorted=true)
+{
+    
+    double t0, t1, t2, t3, t4, t5;
+    const RIT minHashTableSize = 16;
+    const RIT maxHashTableSize = 1024 * 1;
+    const RIT maxHashTableSizeSymbolic = maxHashTableSize;
+    const RIT hashScale = 107;
+    //const RIT minHashTableSize = 2;
+    //const RIT maxHashTableSize = 5;
+    //const RIT hashScale = 3;
+    int nthreads;
+    int nmatrices = matrices.size();
+    CIT ncols = matrices[0]->get_ncols();
+    RIT nrows = matrices[0]->get_nrows();
+    
+    pvector<double> ttimes; // To record time taken by each thread
+    pvector<CPT> splitters; // To store load balance friendly split of columns accross threads;
+
+    pvector<RIT> flopsPerCol(ncols, 0);
+    pvector<RIT> nnzPerCol(ncols, 0);
+
+    t0 = omp_get_wtime();
+#pragma omp parallel for
+    for(CPT i = 0; i < ncols; i++){
+        for(int k = 0; k < nmatrices; k++){
+            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+            flopsPerCol[i] += (*colPtr)[i+1] - (*colPtr)[i];
+        }
+    }
+    t1 = omp_get_wtime();
+
+    pvector<CPT> prefixSum(ncols+1);
+    ParallelPrefixSum(flopsPerCol, prefixSum);
+    
+    CPT flopsTot = prefixSum[ncols];
+    CPT flopsPerThreadExpected;
+    
+    pvector < pvector < std::pair<RIT, RIT> > > nnzPerWindowPerColSymbolic(ncols);
+    pvector < pvector < std::pair<RIT, RIT> > > nnzPerWindowPerCol(ncols);
+
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        double ttime = omp_get_wtime();
+        std::vector<RIT> globalHashVec(minHashTableSize);
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
+            ttimes.resize(nthreads);
+            splitters.resize(nthreads);
+            flopsPerThreadExpected = flopsTot / nthreads;
+        }
+#pragma omp barrier
+        splitters[tid] = std::lower_bound(prefixSum.begin(), prefixSum.end(), tid * flopsPerThreadExpected) - prefixSum.begin();
+#pragma omp barrier
+#pragma omp for schedule(static) nowait
+        for (int t = 0; t < nthreads; t++){
+            CPT colStart = splitters[t];
+            CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
+            for(CPT i = colStart; i < colEnd; i++){
+                int nwindows = flopsPerCol[i] / maxHashTableSizeSymbolic + 1;
+                RIT nrowsPerWindow = nrows / nwindows;
+                nnzPerCol[i] = 0;
+                nnzPerWindowPerColSymbolic[i] = pvector< std::pair<RIT,RIT> >(nwindows);
+                if(nwindows > 1){
+                    for(size_t w=0; w < nwindows; w++){
+                        // Determine the start and end row index
+                        RIT rowStart = w * nrowsPerWindow;
+                        RIT rowEnd = (w == nwindows-1) ? nrows : (w+1) * nrowsPerWindow;
+
+                        nnzPerWindowPerColSymbolic[i][w].first = rowStart;
+                        nnzPerWindowPerColSymbolic[i][w].second = 0;
+
+                        // Determine total number of input nonzeros in the window
+                        size_t flopsWindow = 0;
+                        for(int k = 0; k < nmatrices; k++){
+                            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                            const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                           
+                            auto first = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
+                            auto last = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
+                            flopsWindow += last-first;
+                        }
+                        
+                        // In worst case hash table may need to store all input nonzeros in the window
+                        // So resize the hash table accordingly
+                        size_t htSize = minHashTableSize;
+                        while(htSize < flopsWindow) //htSize is set as 2^n
+                        {
+                            htSize <<= 1;
+                        }
+                        if(globalHashVec.size() < htSize) globalHashVec.resize(htSize);
+                        for(size_t j=0; j < htSize; ++j){
+                            globalHashVec[j] = -1;
+                        }
+                        
+                        // For each matrix
+                        for(int k = 0; k < nmatrices; k++)
+                        {
+                            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                            const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+
+                            // Determine the range of elements that fall within the window
+                            auto first = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
+                            auto last = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
+                            
+                            for(; first<last; first++){
+                                RIT key = *first;
+                                RIT hash = (key*hashScale) & (htSize-1);
+                                while (1) //hash probing
+                                {
+                                    if (globalHashVec[hash] == key) //key is found in hash table
+                                    {
+                                        break;
+                                    }
+                                    else if (globalHashVec[hash] == -1) //key is not registered yet
+                                    {
+                                        globalHashVec[hash] = key;
+                                        nnzPerCol[i]++;
+                                        nnzPerWindowPerColSymbolic[i][w].second++;
+                                        break;
+                                    }
+                                    else //key is not found
+                                    {
+                                        hash = (hash+1) & (htSize-1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    nnzPerWindowPerColSymbolic[i][0].first = 0;
+                    nnzPerWindowPerColSymbolic[i][0].second = 0;
+
+                    size_t htSize = minHashTableSize;
+                    while(htSize < flopsPerCol[i]) //htSize is set as 2^n
+                    {
+                        htSize <<= 1;
+                    }
+                    if(globalHashVec.size() < htSize)
+                        globalHashVec.resize(htSize);
+                    for(size_t j=0; j < htSize; ++j)
+                    {
+                        globalHashVec[j] = -1;
+                    }
+                    
+                    for(int k = 0; k < nmatrices; k++)
+                    {
+                        const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                        const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                        for(CPT j = (*colPtr)[i]; j < (*colPtr)[i+1]; j++)
+                        {
+                            RIT key = (*rowIds)[j];
+                            RIT hash = (key*hashScale) & (htSize-1);
+                            while (1) //hash probing
+                            {
+                                if (globalHashVec[hash] == key) //key is found in hash table
+                                {
+                                    break;
+                                }
+                                else if (globalHashVec[hash] == -1) //key is not registered yet
+                                {
+                                    globalHashVec[hash] = key;
+                                    nnzPerCol[i]++;
+                                    nnzPerWindowPerColSymbolic[i][0].second++;
+                                    break;
+                                }
+                                else //key is not found
+                                {
+                                    hash = (hash+1) & (htSize-1);
+                                }
+                            }
+                        }
+                    }
+                }
+                nnzPerWindowPerCol[i].push_back( std::pair<RIT,RIT>(0, 0) );
+                nwindows = 1;
+                for (int w = 0; w < nnzPerWindowPerColSymbolic[i].size(); w++){
+                    //printf("<rowStart %d, nnz %d> ", nnzPerWindowPerColSymbolic[i][w].first, nnzPerWindowPerColSymbolic[i][w].second);
+                    if (nnzPerWindowPerColSymbolic[i][w].second + nnzPerWindowPerCol[i][nwindows-1].second > maxHashTableSize){
+                        //printf(" -> <rowStart %d, nnz %d> | ", nnzPerWindowPerCol[i][nwindows-1].first, nnzPerWindowPerCol[i][nwindows-1].second);
+                        nnzPerWindowPerCol[i].push_back( std::pair<RIT,RIT>(nnzPerWindowPerColSymbolic[i][w].first, nnzPerWindowPerColSymbolic[i][w].second) );
+                        nwindows++;
+                    }
+                    else{
+                        nnzPerWindowPerCol[i][nwindows-1].second += nnzPerWindowPerColSymbolic[i][w].second;
+                    }
+                }
+            }
+        }
+        ttime = omp_get_wtime() - ttime;
+        ttimes[tid] = ttime;
+    }
+    t1 = omp_get_wtime();
+    //printf("[Hybrid4]\tTime for symbolic: %lf\n", t1-t0);
+    //printf("Stats of time consumed by threads:\n");
+    //getStats<double>(ttimes, true);
+    
+    //pvector<CPT> prefixSum(ncols+1);
+    ParallelPrefixSum(nnzPerCol, prefixSum);
+    pvector<CPT> CcolPtr(prefixSum.begin(), prefixSum.end());
+    pvector<RIT> CrowIds(prefixSum[ncols]);
+    pvector<VT> CnzVals(prefixSum[ncols]);
+    CSC<RIT, VT, CPT> sumMat(nrows, ncols, prefixSum[ncols], false, true);
+    sumMat.cols_pvector(&CcolPtr);
+    
+    CPT nnzCTot = prefixSum[ncols];
+    CPT nnzCPerThreadExpected = nnzCTot / nthreads;
+    
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        double ttime = omp_get_wtime();
+        int tid = omp_get_thread_num();
+        std::vector< std::pair<RIT,VT> > globalHashVec(minHashTableSize);
+        splitters[tid] = std::lower_bound(prefixSum.begin(), prefixSum.end(), tid * nnzCPerThreadExpected) - prefixSum.begin();
+#pragma omp barrier
+#pragma omp for schedule(static) nowait
+        for(int t = 0; t < nthreads; t++){
+            CPT colStart = splitters[t];
+            CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
+            for(CPT i = colStart; i < colEnd; i++){
+                if(nnzPerCol[i] <= maxHashTableSize){
+                    //----------- preparing the hash table for this column -------
+                    size_t htSize = minHashTableSize;
+                    while(htSize < nnzPerCol[i]){
+                        htSize <<= 1;
+                    }   
+                    if(globalHashVec.size() < htSize) globalHashVec.resize(htSize);
+                    for(size_t j=0; j < htSize; ++j){
+                        globalHashVec[j].first = -1;
+                    }
+                
+                    //----------- add this column form all matrices -------
+                    for(int k = 0; k < nmatrices; k++){
+                        const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                        const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                        const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+                    
+                        for(CPT j = (*colPtr)[i]; j < (*colPtr)[i+1]; j++){
+                            RIT key = (*rowIds)[j];
+                            RIT hash = (key*hashScale) & (htSize-1);
+                            VT curval = (*nzVals)[j];
+                            while (1) //hash probing
+                            {
+                                if (globalHashVec[hash].first == key) //key is found in hash table
+                                {
+                                    globalHashVec[hash].second += curval;
+                                    break;
+                                }
+                                else if (globalHashVec[hash].first == -1) //key is not registered yet
+                                {
+                                    globalHashVec[hash].first = key;
+                                    globalHashVec[hash].second = curval;
+                                    break;
+                                }
+                                else //key is not found
+                                {
+                                    hash = (hash+1) & (htSize-1);
+                                }
+                            }   
+                        }
+                    }
+               
+                    size_t index = 0;
+                    for (size_t j=0; j < htSize; ++j){
+                        if (globalHashVec[j].first != -1){
+                            globalHashVec[index++] = globalHashVec[j];
+                        }
+                    }
+                
+                    std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
+                
+                    for (size_t j=0; j < index; ++j){
+                        CrowIds[prefixSum[i]] = globalHashVec[j].first;
+                        CnzVals[prefixSum[i]] = globalHashVec[j].second;
+                        prefixSum[i] ++;
+                    }
+                }
+                else{
+                    //if(tid == 0) printf("Column %d being processed with sliding window: ", i);
+                    //if(tid == 0) printf("%d windows\n ", windowSplitters.size());
+                    pvector< std::pair<RIT, RIT> > rowIdsRange(nmatrices);
+                    for(int k = 0; k < nmatrices; k++){
+                        const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                        const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                        const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+                        rowIdsRange[k].first = (*colPtr)[i];
+                        rowIdsRange[k].second = (*colPtr)[i+1];
+                    }
+                    for (int w = 0; w < nnzPerWindowPerCol[i].size(); w++){
+                        //if(tid == 0) printf("[Hybrid4]\tMerging window %d\n", w);
+                        RIT rowStart = nnzPerWindowPerCol[i][w].first;
+                        RIT rowEnd = (w == nnzPerWindowPerCol[i].size()-1) ? nrows : nnzPerWindowPerCol[i][w+1].first;
+                        RIT nnzWindow = nnzPerWindowPerCol[i][w].second;
+
+                        size_t htSize = minHashTableSize;
+                        while(htSize < nnzWindow) //htSize is set as 2^n
+                        {
+                            htSize <<= 1;
+                        }
+                        if(globalHashVec.size() < htSize)
+                            globalHashVec.resize(htSize);
+                        for(size_t j=0; j < htSize; ++j)
+                        {
+                            globalHashVec[j].first = -1;
+                        }
+
+                        for(int k = 0; k < nmatrices; k++)
+                        {
+                            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                            const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                            const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+
+                            while( (rowIdsRange[k].first < rowIdsRange[k].second) && ((*rowIds)[rowIdsRange[k].first] < rowEnd) ){
+                                //printf("[Hybrid4]\tThread %d Column %d window %d Merging row %d of %dth matrix\n", tid, i, w, (*rowIds)[rowIdsRange[k].first], k);
+                                RIT j = rowIdsRange[k].first;
+                                RIT key = (*rowIds)[j];
+                                RIT hash = (key*hashScale) & (htSize-1);
+                                VT curval = (*nzVals)[j];
+                                while (1) //hash probing
+                                {
+                                    //printf("[Hybrid4]\tThread %d Column %d window %d probing %d row %d of %dth matrix: %d\n", tid, i, w, hash, (*rowIds)[rowIdsRange[k].first], k, globalHashVec[hash].first);
+                                    if (globalHashVec[hash].first == key) //key is found in hash table
+                                    {
+                                        globalHashVec[hash].second += curval;
+                                        break;
+                                    }
+                                    else if (globalHashVec[hash].first == -1) //key is not registered yet
+                                    {
+                                        globalHashVec[hash].first = key;
+                                        globalHashVec[hash].second = curval;
+                                        break;
+                                    }
+                                    else //key is not found
+                                    {
+                                        hash = (hash+1) & (htSize-1);
+                                    }
+                                }
+
+                                rowIdsRange[k].first++;
+                            } 
+                        }
+                        size_t index = 0;
+                        for (size_t j=0; j < htSize; ++j){
+                            if (globalHashVec[j].first != -1){
+                                globalHashVec[index++] = globalHashVec[j];
+                            }
+                        }
+                
+                        std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
+                    
+                        for (size_t j=0; j < index; ++j){
+                            CrowIds[prefixSum[i]] = globalHashVec[j].first;
+                            CnzVals[prefixSum[i]] = globalHashVec[j].second;
+                            prefixSum[i] ++;
+                        }
+                    }
+
+                    //if(tid == 0) printf("[Hybrid4]\tAll windows merged\n");
+                }
+            }
+        }
+        ttime = omp_get_wtime() - ttime;
+        ttimes[tid] = ttime;
+#pragma omp barrier
+    }
+    t1 = omp_get_wtime();
+    //printf("[Hybrid4]\tTime for computation: %lf\n", t1-t0);
+    //printf("Stats of time consumed by threads:\n");
+    //getStats<double>(ttimes, true);
+
+    sumMat.nz_rows_pvector(&CrowIds);
+    sumMat.nz_vals_pvector(&CnzVals);
+    return std::move(sumMat);
+}
+
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
 CSC<RIT, VT, CPT> SpMultiAddSpA(std::vector<CSC<RIT, VT, CPT>* > & matrices, pvector<RIT> & nnzPerCol, bool sorted=true)
 {
@@ -2026,32 +2449,37 @@ CSC<RIT, VT, CPT> SpMultiAdd(std::vector<CSC<RIT, VT, CPT>* > & matrices, int ve
         }
     }
 
-    t0 = omp_get_wtime();
-    pvector<RIT> nnzCPerCol = symbolicSpMultiAddHash<RIT, CIT, VT, CPT, int32_t>(matrices);
-    t1 = omp_get_wtime();
-    printf("Time for symbolic: %lf\n", t1-t0);
-    
-    t0 = omp_get_wtime();
-    pvector<RIT> nnzCPerCol1 = symbolicSpMultiAddHashSliding<RIT, CIT, VT, CPT, int32_t>(matrices);
-    t1 = omp_get_wtime();
-    printf("Time for symbolic sliding new: %lf\n", t1-t0);
-    
-    t0 = omp_get_wtime();
-    pvector<RIT> nnzCPerCol2 = symbolicSpMultiAddHashSliding1<RIT, CIT, VT, CPT, int32_t>(matrices);
-    t1 = omp_get_wtime();
-    printf("Time for symbolic sliding old: %lf\n", t1-t0);
-    
-    for(CIT i=0; i< ncols; i++)
-    {
-        if(nnzCPerCol[i] != nnzCPerCol1[i]) std::cout << "not equal" << std::endl;
+    if(version != 4) {
+        t0 = omp_get_wtime();
+        pvector<RIT> nnzCPerCol = symbolicSpMultiAddHash<RIT, CIT, VT, CPT, int32_t>(matrices);
+        t1 = omp_get_wtime();
+        //printf("Time for symbolic: %lf\n", t1-t0);
+        if(version == 0) return SpMultiAddHash<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
+        else if(version == 1) return SpMultiAddHybrid<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
+        else if(version == 2) return SpMultiAddHybrid2<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
+        else if(version == 3) return SpMultiAddHybrid3<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
+        else return SpMultiAddHybrid3<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
     }
-    printf("Symbolic Equal!\n");
+    else {
+        return SpMultiAddHybrid4<RIT, CIT, VT, CPT>(matrices, true);
+    }
     
-    if(version == 0) return SpMultiAddHash<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
-    else if(version == 1) return SpMultiAddHybrid<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
-    else if(version == 2) return SpMultiAddHybrid2<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
-    else if(version == 3) return SpMultiAddHybrid3<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
-    else return SpMultiAddHybrid3<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
+    //t0 = omp_get_wtime();
+    //pvector<RIT> nnzCPerCol1 = symbolicSpMultiAddHashSliding<RIT, CIT, VT, CPT, int32_t>(matrices);
+    //t1 = omp_get_wtime();
+    //printf("Time for symbolic sliding new: %lf\n", t1-t0);
+    
+    //t0 = omp_get_wtime();
+    //pvector<RIT> nnzCPerCol2 = symbolicSpMultiAddHashSliding1<RIT, CIT, VT, CPT, int32_t>(matrices);
+    //t1 = omp_get_wtime();
+    //printf("Time for symbolic sliding old: %lf\n", t1-t0);
+    
+    //for(CIT i=0; i< ncols; i++)
+    //{
+        //if(nnzCPerCol[i] != nnzCPerCol1[i]) std::cout << "not equal" << std::endl;
+    //}
+    //printf("Symbolic Equal!\n");
+    
     
     //return SpMultiAddSpA3<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
 }
