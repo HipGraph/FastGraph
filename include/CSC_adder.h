@@ -326,32 +326,16 @@ pvector<RIT> symbolicSpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > &vec_of_mat
     }
     t1 = omp_get_wtime();
 
-    pvector<CPT> prefix_sum(num_of_columns+1);
+    pvector<int64_t> prefix_sum(num_of_columns+1);
     ParallelPrefixSum(flops_per_column, prefix_sum);
     
-    CIT flops_tot = prefix_sum[num_of_columns];
-    CIT flops_per_thread_expected;
+    int64_t flops_tot = prefix_sum[num_of_columns];
+    int64_t flops_per_thread_expected;
     
     const RIT minHashTableSize = 16;
     const RIT hashScale = 107;
     int nthreads;
     pvector<CIT> splitters;
-
-        //int tid = omp_get_thread_num();
-        //if(tid == 0){
-            //nthreads = omp_get_num_threads();
-            //ttimes.resize(nthreads);
-            //splitters.resize(nthreads);
-            //flopsPerThreadExpected = flopsTot / nthreads;
-        //}
-//#pragma omp barrier
-        //splitters[tid] = std::lower_bound(prefixSum.begin(), prefixSum.end(), tid * flopsPerThreadExpected) - prefixSum.begin();
-//#pragma omp barrier
-//#pragma omp for schedule(static) nowait
-        //for (int t = 0; t < nthreads; t++){
-            //CPT colStart = splitters[t];
-            //CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
-            //for(CPT i = colStart; i < colEnd; i++){
 
 #pragma omp parallel
     {
@@ -1552,9 +1536,11 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
 {
     
     double t0, t1, t2, t3, t4, t5;
+
+    t0 = omp_get_wtime();
     const RIT minHashTableSize = 16;
-    const RIT maxHashTableSize = 1024 * 1;
-    const RIT maxHashTableSizeSymbolic = maxHashTableSize;
+    const RIT maxHashTableSize = 512 * 1;
+    const RIT maxHashTableSizeSymbolic = 512 * 1;
     const RIT hashScale = 107;
     //const RIT minHashTableSize = 2;
     //const RIT maxHashTableSize = 5;
@@ -1567,10 +1553,10 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
     pvector<double> ttimes; // To record time taken by each thread
     pvector<CPT> splitters; // To store load balance friendly split of columns accross threads;
 
-    pvector<RIT> flopsPerCol(ncols, 0);
+    pvector<int64_t> flopsPerCol(ncols, 0);
     pvector<RIT> nnzPerCol(ncols, 0);
 
-    t0 = omp_get_wtime();
+    //t0 = omp_get_wtime();
 #pragma omp parallel for
     for(CPT i = 0; i < ncols; i++){
         for(int k = 0; k < nmatrices; k++){
@@ -1578,16 +1564,19 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
             flopsPerCol[i] += (*colPtr)[i+1] - (*colPtr)[i];
         }
     }
-    t1 = omp_get_wtime();
+    //t1 = omp_get_wtime();
 
-    pvector<CPT> prefixSum(ncols+1);
-    ParallelPrefixSum(flopsPerCol, prefixSum);
+    pvector<int64_t> prefixSumSymbolic(ncols+1);
+    ParallelPrefixSum(flopsPerCol, prefixSumSymbolic);
     
-    CPT flopsTot = prefixSum[ncols];
-    CPT flopsPerThreadExpected;
+    int64_t flopsTot = prefixSumSymbolic[ncols];
+    int64_t flopsPerThreadExpected;
+    //printf("Total flops: %lld\n", flopsTot);
     
     pvector < pvector < std::pair<RIT, RIT> > > nnzPerWindowPerColSymbolic(ncols);
     pvector < pvector < std::pair<RIT, RIT> > > nnzPerWindowPerCol(ncols);
+    t1 = omp_get_wtime();
+    //printf("[Hybrid4]\t Time before symbolic: %lf\n", t1-t0);
 
     t0 = omp_get_wtime();
 #pragma omp parallel
@@ -1600,14 +1589,17 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
             ttimes.resize(nthreads);
             splitters.resize(nthreads);
             flopsPerThreadExpected = flopsTot / nthreads;
+            //printf("Expected flops per thread: %lld\n", flopsPerThreadExpected);
         }
 #pragma omp barrier
-        splitters[tid] = std::lower_bound(prefixSum.begin(), prefixSum.end(), tid * flopsPerThreadExpected) - prefixSum.begin();
+        splitters[tid] = std::lower_bound(prefixSumSymbolic.begin(), prefixSumSymbolic.end(), tid * flopsPerThreadExpected) - prefixSumSymbolic.begin();
+        //printf("splitters[%d] %d: target %lld\n", tid, splitters[tid], tid * flopsPerThreadExpected);
 #pragma omp barrier
 #pragma omp for schedule(static) nowait
         for (int t = 0; t < nthreads; t++){
             CPT colStart = splitters[t];
             CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
+            //printf("Thread %d processing %d columns: [%d, %d)\n", t, colEnd-colStart, colStart, colEnd);
             for(CPT i = colStart; i < colEnd; i++){
                 int nwindows = flopsPerCol[i] / maxHashTableSizeSymbolic + 1;
                 RIT nrowsPerWindow = nrows / nwindows;
@@ -1745,11 +1737,32 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
         ttimes[tid] = ttime;
     }
     t1 = omp_get_wtime();
-    //printf("[Hybrid4]\tTime for symbolic: %lf\n", t1-t0);
-    //printf("Stats of time consumed by threads:\n");
-    //getStats<double>(ttimes, true);
+    printf("[Hybrid4]\tTime for symbolic: %lf\n", t1-t0);
+    printf("Stats of time consumed by threads:\n");
+    getStats<double>(ttimes, true);
+
+    //size_t maxWindowSymbolic=0;
+    //size_t minWindowSymbolic=ncols;
+    //size_t avgWindowSymbolic=0;
+    //size_t maxWindow=0;
+    //size_t minWindow = ncols;
+    //size_t avgWindow=0;
+////#pragma omp parallel for reduction
+    //for (CPT i = 0; i < ncols; i++){
+        //maxWindowSymbolic = std::max(maxWindowSymbolic, nnzPerWindowPerColSymbolic[i].size());
+        //minWindowSymbolic = std::min(minWindowSymbolic, nnzPerWindowPerColSymbolic[i].size());
+        //avgWindowSymbolic = avgWindowSymbolic + nnzPerWindowPerColSymbolic[i].size();
+        //maxWindow = std::max(maxWindow, nnzPerWindowPerCol[i].size());
+        //minWindow = std::min(minWindow, nnzPerWindowPerCol[i].size());
+        //avgWindow = avgWindow + nnzPerWindowPerCol[i].size();
+    //}
+    //avgWindowSymbolic /= ncols;
+    //avgWindow /= ncols;
+
+    //printf("Window statistics for symbolic: max %d, min %d, avg %d\n", maxWindowSymbolic, minWindowSymbolic, avgWindowSymbolic);
+    //printf("Window statistics for computation: max %d, min %d, avg %d\n", maxWindow, minWindow, avgWindow);
     
-    //pvector<CPT> prefixSum(ncols+1);
+    pvector<CPT> prefixSum(ncols+1, 0);
     ParallelPrefixSum(nnzPerCol, prefixSum);
     pvector<CPT> CcolPtr(prefixSum.begin(), prefixSum.end());
     pvector<RIT> CrowIds(prefixSum[ncols]);
@@ -1866,14 +1879,12 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
                             const pvector<VT> *nzVals = matrices[k]->get_nzVals();
 
                             while( (rowIdsRange[k].first < rowIdsRange[k].second) && ((*rowIds)[rowIdsRange[k].first] < rowEnd) ){
-                                //printf("[Hybrid4]\tThread %d Column %d window %d Merging row %d of %dth matrix\n", tid, i, w, (*rowIds)[rowIdsRange[k].first], k);
                                 RIT j = rowIdsRange[k].first;
                                 RIT key = (*rowIds)[j];
                                 RIT hash = (key*hashScale) & (htSize-1);
                                 VT curval = (*nzVals)[j];
                                 while (1) //hash probing
                                 {
-                                    //printf("[Hybrid4]\tThread %d Column %d window %d probing %d row %d of %dth matrix: %d\n", tid, i, w, hash, (*rowIds)[rowIdsRange[k].first], k, globalHashVec[hash].first);
                                     if (globalHashVec[hash].first == key) //key is found in hash table
                                     {
                                         globalHashVec[hash].second += curval;
@@ -1910,7 +1921,6 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
                         }
                     }
 
-                    //if(tid == 0) printf("[Hybrid4]\tAll windows merged\n");
                 }
             }
         }
@@ -1919,9 +1929,9 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
 #pragma omp barrier
     }
     t1 = omp_get_wtime();
-    //printf("[Hybrid4]\tTime for computation: %lf\n", t1-t0);
-    //printf("Stats of time consumed by threads:\n");
-    //getStats<double>(ttimes, true);
+    printf("[Hybrid4]\tTime for computation: %lf\n", t1-t0);
+    printf("Stats of time consumed by threads:\n");
+    getStats<double>(ttimes, true);
 
     sumMat.nz_rows_pvector(&CrowIds);
     sumMat.nz_vals_pvector(&CnzVals);
@@ -2453,7 +2463,7 @@ CSC<RIT, VT, CPT> SpMultiAdd(std::vector<CSC<RIT, VT, CPT>* > & matrices, int ve
         t0 = omp_get_wtime();
         pvector<RIT> nnzCPerCol = symbolicSpMultiAddHash<RIT, CIT, VT, CPT, int32_t>(matrices);
         t1 = omp_get_wtime();
-        //printf("Time for symbolic: %lf\n", t1-t0);
+        printf("Time for symbolic: %lf\n", t1-t0);
         if(version == 0) return SpMultiAddHash<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
         else if(version == 1) return SpMultiAddHybrid<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
         else if(version == 2) return SpMultiAddHybrid2<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
