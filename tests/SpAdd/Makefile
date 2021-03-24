@@ -1,7 +1,7 @@
 #MKLROOT = /opt/intel/mkl
 MKLROOT = /N/u2/t/taufique/intel/mkl
 CC = g++ -fopenmp -std=c++11 -DMKL_ILP64 -m64
-#CC = g++ -fopenmp -std=c++11 -DMKL_ILP64 -m64 -g -Og -mavx # Use this if binary is used with Valgrind
+#CC = g++ -fopenmp -std=c++11 -DMKL_ILP64 -m64 -g -Og -pg -mavx # Use this if binary is used with Valgrind
 INC = ${MKLROOT}/include
 #LIB = ${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_gnu_thread -lpthread -lm -ldl
 LIB = -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_ilp64.a \
