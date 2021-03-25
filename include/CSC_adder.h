@@ -417,6 +417,8 @@ pvector<RIT> symbolicSpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > &vec_of_mat
     printf("[Symbolic Hash] Time for parallel section: %lf\n", t1-t0);
     printf("[Symbolic Hash] Stats of parallel section timing:\n");
     getStats<double>(ttimes, true);
+    printf("---\n");
+    
     // parallel programming ended
     //for (int i = 0 ; i < nz_per_column.size(); i++){
         //fp << nz_per_column[i] << std::endl;
@@ -1120,11 +1122,11 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pv
         ttimes[tid] = ttime;
 #pragma omp barrier
     }
-
     t1 = omp_get_wtime();
     printf("[Hash]\tTime for parallel section: %lf\n", t1-t0);
     printf("[Hash]\tStats for parallel section timing:\n");
     getStats<double>(ttimes, true);
+    printf("***\n\n");
 
     Timer clock;
     clock.Start();
@@ -1814,14 +1816,14 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
     t0 = omp_get_wtime();
     const RIT minHashTableSize = 16;
     const RIT maxHashTableSize = 512 * 2;
-    const RIT maxHashTableSizeSymbolic = 512 * 4;
+    const RIT maxHashTableSizeSymbolic = 512 * 2;
     const RIT hashScale = 107;
     //const RIT minHashTableSize = 2;
     //const RIT maxHashTableSize = 5;
     //const RIT maxHashTableSizeSymbolic = 5;
     //const RIT hashScale = 3;
-    int nthreads;
-    int nmatrices = matrices.size();
+    size_t nthreads;
+    size_t nmatrices = matrices.size();
     CIT ncols = matrices[0]->get_ncols();
     RIT nrows = matrices[0]->get_nrows();
     
@@ -1859,9 +1861,10 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
     int64_t flopsPerThreadExpected;
     
     t1 = omp_get_wtime();
-    printf("[Sliding Hash]\tTime before symbolic: %lf\n", t1-t0);
-    printf("[Sliding Hash]\tStats of number of windows of symbolic:\n");
-    getStats<int64_t>(nWindowPerColSymbolic, true);
+    //printf("[Sliding Hash]\tTime before symbolic: %lf\n", t1-t0);
+    
+    //printf("[Sliding Hash]\tStats of number of windows of symbolic:\n");
+    //getStats<int64_t>(nWindowPerColSymbolic, true);
 
     t0 = omp_get_wtime();
 #pragma omp parallel
@@ -1886,7 +1889,7 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
             CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
             //printf("Thread %d processing %d columns: [%d, %d)\n", t, colEnd-colStart, colStart, colEnd);
             for(CPT i = colStart; i < colEnd; i++){
-                int64_t nwindows = nWindowPerColSymbolic[i];
+                size_t nwindows = nWindowPerColSymbolic[i];
                 RIT nrowsPerWindow = nrows / nwindows;
                 nnzPerCol[i] = 0;
                 nWindowPerCol[i] = 0;
@@ -2055,27 +2058,7 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
     printf("[Sliding Hash]\tTime for symbolic: %lf\n", t1-t0);
     printf("[Sliding Hash]\tStats of time consumed by threads:\n");
     getStats<double>(ttimes, true);
-
-    //size_t maxWindowSymbolic=0;
-    //size_t minWindowSymbolic=ncols;
-    //size_t avgWindowSymbolic=0;
-    //size_t maxWindow=0;
-    //size_t minWindow = ncols;
-    //size_t avgWindow=0;
-////#pragma omp parallel for reduction
-    //for (CPT i = 0; i < ncols; i++){
-        //maxWindowSymbolic = std::max(maxWindowSymbolic, nnzPerWindowPerColSymbolic[i].size());
-        //minWindowSymbolic = std::min(minWindowSymbolic, nnzPerWindowPerColSymbolic[i].size());
-        //avgWindowSymbolic = avgWindowSymbolic + nnzPerWindowPerColSymbolic[i].size();
-        //maxWindow = std::max(maxWindow, nnzPerWindowPerCol[i].size());
-        //minWindow = std::min(minWindow, nnzPerWindowPerCol[i].size());
-        //avgWindow = avgWindow + nnzPerWindowPerCol[i].size();
-    //}
-    //avgWindowSymbolic /= ncols;
-    //avgWindow /= ncols;
-
-    //printf("Window statistics for symbolic: max %d, min %d, avg %d\n", maxWindowSymbolic, minWindowSymbolic, avgWindowSymbolic);
-    //printf("Window statistics for computation: max %d, min %d, avg %d\n", maxWindow, minWindow, avgWindow);
+    printf("---\n");
     
     pvector<RIT> prefixSumWindow(ncols+1, 0);
     ParallelPrefixSum(nWindowPerCol, prefixSumWindow);
@@ -2084,8 +2067,8 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
         //printf("%d -> %d\n", nWindowPerColSymbolic[i], nWindowPerCol[i]);
     //}
 
-    printf("[Sliding Hash]\tStats of number of windows:\n");
-    getStats<RIT>(nWindowPerCol, true);
+    //printf("[Sliding Hash]\tStats of number of windows:\n");
+    //getStats<RIT>(nWindowPerCol, true);
 
     pvector< std::pair<RIT, RIT> > nnzPerWindow(prefixSumWindow[ncols]);
     
@@ -2114,7 +2097,7 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
         }
     }
     t1 = omp_get_wtime();
-    printf("[Hybrid4]\tTime for collapsing windows: %lf\n", t1-t0);
+    //printf("[Hybrid4]\tTime for collapsing windows: %lf\n", t1-t0);
 
     //for (CPT i = 0; i < ncols; i++){
         //printf("Column %d: ", i);
@@ -2144,11 +2127,17 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
     CPT nnzCTot = prefixSum[ncols];
     CPT nnzCPerThreadExpected = nnzCTot / nthreads;
     
+    size_t cacheL1 = 32 * 1024;
+    size_t elementsToFitL1 = cacheL1 / sizeof( std::pair<RIT,RIT> );
+    size_t padding = std::max(elementsToFitL1, nmatrices); // 32KB L1 cache / 8B element size = 4096 elements needed to fit cache line
+    pvector< std::pair< RIT, RIT > > rowIdsRange(padding * nthreads); // Padding to avoid false sharing
+    
     t0 = omp_get_wtime();
 #pragma omp parallel
     {
         double ttime = omp_get_wtime();
         int tid = omp_get_thread_num();
+        //pvector< std::pair< RIT, RIT > > rowIdsRange(nmatrices);
         std::vector< std::pair<RIT,VT> > globalHashVec(minHashTableSize);
         splitters[tid] = std::lower_bound(prefixSum.begin(), prefixSum.end(), tid * nnzCPerThreadExpected) - prefixSum.begin();
 #pragma omp barrier
@@ -2158,18 +2147,86 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
             CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
             for(CPT i = colStart; i < colEnd; i++){
                 RIT nwindows = nWindowPerCol[i];
-                pvector< std::pair<RIT, RIT> > rowIdsRange(nmatrices);
-                for(int k = 0; k < nmatrices; k++){
-                    const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
-                    const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
-                    const pvector<VT> *nzVals = matrices[k]->get_nzVals();
-                    rowIdsRange[k].first = (*colPtr)[i];
-                    rowIdsRange[k].second = (*colPtr)[i+1];
+                if(nwindows > 1){
+                    for(int k = 0; k < nmatrices; k++){
+                        const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                        const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                        const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+                        rowIdsRange[padding * tid + k].first = (*colPtr)[i];
+                        rowIdsRange[padding * tid + k].second = (*colPtr)[i+1];
+                    }
+                    for (int w = 0; w < nwindows; w++){
+                        RIT wIdx = prefixSumWindow[i] + w;
+                        RIT rowStart = nnzPerWindow[wIdx].first;
+                        RIT rowEnd = (w == nWindowPerCol[i]-1) ? nrows : nnzPerWindow[wIdx+1].first;
+                        RIT nnzWindow = nnzPerWindow[wIdx].second;
+
+                        size_t htSize = minHashTableSize;
+                        while(htSize < nnzWindow) //htSize is set as 2^n
+                        {
+                            htSize <<= 1;
+                        }
+                        if(globalHashVec.size() < htSize)
+                            globalHashVec.resize(htSize);
+                        for(size_t j=0; j < htSize; ++j)
+                        {
+                            globalHashVec[j].first = -1;
+                        }
+                        
+                        for(int k = 0; k < nmatrices; k++)
+                        {
+                            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                            const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                            const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+
+                            while( (rowIdsRange[padding * tid + k].first < rowIdsRange[padding * tid + k].second) && ((*rowIds)[rowIdsRange[padding * tid + k].first] < rowEnd) ){
+                                //printf("Thread %d, Column %d, Window %d\n", tid, i, w);
+                                RIT j = rowIdsRange[padding * tid + k].first;
+                                RIT key = (*rowIds)[j];
+                                RIT hash = (key*hashScale) & (htSize-1);
+                                VT curval = (*nzVals)[j];
+                                while (1) //hash probing
+                                {
+                                    if (globalHashVec[hash].first == key) //key is found in hash table
+                                    {
+                                        globalHashVec[hash].second += curval;
+                                        break;
+                                    }
+                                    else if (globalHashVec[hash].first == -1) //key is not registered yet
+                                    {
+                                        globalHashVec[hash].first = key;
+                                        globalHashVec[hash].second = curval;
+                                        break;
+                                    }
+                                    else //key is not found
+                                    {
+                                        hash = (hash+1) & (htSize-1);
+                                    }
+                                }
+
+                                rowIdsRange[padding * tid + k].first++;
+                            } 
+                        }
+
+                        size_t index = 0;
+                        for (size_t j=0; j < htSize; ++j){
+                            if (globalHashVec[j].first != -1){
+                                globalHashVec[index++] = globalHashVec[j];
+                            }
+                        }
+                
+                        std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
+                    
+                        for (size_t j=0; j < index; ++j){
+                            CrowIds[prefixSum[i]] = globalHashVec[j].first;
+                            CnzVals[prefixSum[i]] = globalHashVec[j].second;
+                            prefixSum[i] ++;
+                        }
+                    }
+                    
                 }
-                for (int w = 0; w < nwindows; w++){
-                    RIT wIdx = prefixSumWindow[i] + w;
-                    RIT rowStart = nnzPerWindow[wIdx].first;
-                    RIT rowEnd = (w == nWindowPerCol[i]-1) ? nrows : nnzPerWindow[wIdx+1].first;
+                else{
+                    RIT wIdx = prefixSumWindow[i];
                     RIT nnzWindow = nnzPerWindow[wIdx].second;
 
                     size_t htSize = minHashTableSize;
@@ -2184,14 +2241,13 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
                         globalHashVec[j].first = -1;
                     }
 
-                    for(int k = 0; k < nmatrices; k++)
+                    for(size_t k = 0; k < nmatrices; k++)
                     {
                         const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
                         const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
                         const pvector<VT> *nzVals = matrices[k]->get_nzVals();
 
-                        while( (rowIdsRange[k].first < rowIdsRange[k].second) && ((*rowIds)[rowIdsRange[k].first] < rowEnd) ){
-                            RIT j = rowIdsRange[k].first;
+                        for( RIT j = (*colPtr)[i]; j < (*colPtr)[i+1]; j++){
                             RIT key = (*rowIds)[j];
                             RIT hash = (key*hashScale) & (htSize-1);
                             VT curval = (*nzVals)[j];
@@ -2213,11 +2269,8 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
                                     hash = (hash+1) & (htSize-1);
                                 }
                             }
-
-                            rowIdsRange[k].first++;
                         } 
                     }
-                    //if(tid == 0) printf("Thread %d finished window %d out of %d windows of column %d in range [%d,%d)\n", tid, w, nwindows, i, colStart, colEnd);
                     size_t index = 0;
                     for (size_t j=0; j < htSize; ++j){
                         if (globalHashVec[j].first != -1){
@@ -2240,9 +2293,10 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
 #pragma omp barrier
     }
     t1 = omp_get_wtime();
-    printf("[Hybrid4]\tTime for computation: %lf\n", t1-t0);
-    printf("Stats of time consumed by threads:\n");
+    printf("[Sliding Hash]\tTime for computation: %lf\n", t1-t0);
+    printf("[Sliding Hash]\tStats of parallel section timings:\n");
     getStats<double>(ttimes, true);
+    printf("***\n\n");
 
     sumMat.nz_rows_pvector(&CrowIds);
     sumMat.nz_vals_pvector(&CnzVals);
@@ -2774,7 +2828,7 @@ CSC<RIT, VT, CPT> SpMultiAdd(std::vector<CSC<RIT, VT, CPT>* > & matrices, int ve
         t0 = omp_get_wtime();
         pvector<RIT> nnzCPerCol = symbolicSpMultiAddHash<RIT, CIT, VT, CPT, int32_t>(matrices);
         t1 = omp_get_wtime();
-        printf("Time for symbolic: %lf\n", t1-t0);
+        //printf("Time for symbolic: %lf\n", t1-t0);
         if(version == 0) return SpMultiAddHash<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
         else if(version == 1) return SpMultiAddHybrid<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
         else if(version == 2) return SpMultiAddHybrid2<RIT, CIT, VT, CPT>(matrices, nnzCPerCol, true);
