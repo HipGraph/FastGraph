@@ -140,8 +140,8 @@ int main(int argc, char* argv[]){
 
     //std::vector<int> threads{1, 6, 12, 24, 48};
     //std::vector<int> threads{1, 16, 48};
-    //std::vector<int> threads{1, 12, 24};
-    std::vector<int> threads{24};
+    std::vector<int> threads{1, 12, 24};
+    //std::vector<int> threads{24};
 
     for(int i = 0; i < threads.size(); i++){
         omp_set_num_threads(threads[i]);
@@ -344,11 +344,16 @@ int main(int argc, char* argv[]){
         //t1 = omp_get_wtime();
         //printf("Time for symbolic with sliding hash: %lf\n", t1-t0);
         
+        //bool flag = true;
         //for(int32_t i=0; i< nnzCPerCol.size(); i++)
         //{
-            //if(nnzCPerCol[i] != nnzCPerCol2[i]) std::cout << "not equal" << std::endl;
+            //if(nnzCPerCol[i] != nnzCPerCol2[i]){
+                //flag = false;
+               ////std::cout << "not equal" << std::endl;
+            //}
         //}
-        //printf("Symbolic Equal!\n");
+        //if(flag == true) printf("Symbolic equal!\n");
+        //if(flag == false) printf("Symbolic not equal!\n");
 
         
         
