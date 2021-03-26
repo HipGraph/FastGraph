@@ -414,10 +414,10 @@ pvector<RIT> symbolicSpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > &vec_of_mat
         ttimes[tid] = ttime;
     }
     t1 = omp_get_wtime();
-    printf("[Symbolic Hash] Time for parallel section: %lf\n", t1-t0);
-    printf("[Symbolic Hash] Stats of parallel section timing:\n");
-    getStats<double>(ttimes, true);
-    printf("---\n");
+    //printf("[Symbolic Hash] Time for parallel section: %lf\n", t1-t0);
+    //printf("[Symbolic Hash] Stats of parallel section timing:\n");
+    //getStats<double>(ttimes, true);
+    //printf("---\n");
     
     // parallel programming ended
     //for (int i = 0 ; i < nz_per_column.size(); i++){
@@ -730,145 +730,93 @@ pvector<RIT> symbolicSpMultiAddHashSliding2(std::vector<CSC<RIT, VT, CPT>* > &ma
     //const RIT maxHashTableSize = 5;
     //const RIT maxHashTableSizeSymbolic = 5;
     //const RIT hashScale = 3;
-    int nthreads;
-    int nmatrices = matrices.size();
+    size_t nthreads;
+    size_t nmatrices = matrices.size();
     CIT ncols = matrices[0]->get_ncols();
     RIT nrows = matrices[0]->get_nrows();
     
     pvector<double> ttimes; // To record time taken by each thread
     pvector<CPT> splitters; // To store load balance friendly split of columns accross threads;
 
-    pvector<int64_t> flopsPerCol(ncols);
-    pvector<int64_t> nWindowPerColSymbolic(ncols); 
+    pvector<size_t> flopsPerCol(ncols);
+    pvector<size_t> nWindowPerColSymbolic(ncols); 
     pvector<RIT> nWindowPerCol(ncols); 
     pvector<RIT> nnzPerCol(ncols, 0);
 
     t2 = omp_get_wtime();
-#pragma omp parallel for
-    for(CPT i = 0; i < ncols; i++){
-        flopsPerCol[i] = 0;
-        for(int k = 0; k < nmatrices; k++){
-            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
-            flopsPerCol[i] += (*colPtr)[i+1] - (*colPtr)[i];
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
         }
-        nWindowPerColSymbolic[i] = flopsPerCol[i] / maxHashTableSizeSymbolic + 1;
+#pragma omp for
+        for(CPT i = 0; i < ncols; i++){
+            flopsPerCol[i] = 0;
+            for(int k = 0; k < nmatrices; k++){
+                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                flopsPerCol[i] += (*colPtr)[i+1] - (*colPtr)[i];
+            }
+            nWindowPerColSymbolic[i] = (flopsPerCol[i] / maxHashTableSizeSymbolic) + 1;
+        }
     }
     t3 = omp_get_wtime();
-    printf("[symbolic sliding hash]\tTime for number of window calculation: %lf\n", t3-t2);
+    //printf("[Hybrid4]\tTime for number of window calculation: %lf\n", t3-t2);
     
 
-    pvector<int64_t> prefixSumSymbolic(ncols+1, 0);
+    pvector<size_t> prefixSumSymbolic(ncols+1, 0);
     ParallelPrefixSum(flopsPerCol, prefixSumSymbolic);
 
-    pvector<int64_t> prefixSumWindowSymbolic(ncols+1, 0);
+    pvector<size_t> prefixSumWindowSymbolic(ncols+1, 0);
     ParallelPrefixSum(nWindowPerColSymbolic, prefixSumWindowSymbolic);
-    printf("[symbolic sliding hash] stats of number of window per column\n");
-    getStats<int64_t>(nWindowPerColSymbolic, true);
-    printf("***\n\n");
 
     pvector < std::pair<RIT, RIT> > nnzPerWindowSymbolic(prefixSumWindowSymbolic[ncols]);
     
-    int64_t flopsTot = prefixSumSymbolic[ncols];
-    int64_t flopsPerThreadExpected;
+    size_t flopsTot = prefixSumSymbolic[ncols];
+    size_t flopsPerThreadExpected;
     
     t1 = omp_get_wtime();
-    printf("[symbolic sliding hash]\tTime before symbolic: %lf\n", t1-t0);
+    //printf("[Sliding Hash]\tTime before symbolic: %lf\n", t1-t0);
+    
+    //printf("[Sliding Hash]\tStats of number of windows of symbolic:\n");
+    //getStats<int64_t>(nWindowPerColSymbolic, true);
+    
+    size_t cacheL1 = 32 * 1024;
+    size_t elementsToFitL1 = cacheL1 / sizeof( std::pair<RIT,RIT> ); // 32KB L1 cache / 8B element size = 4096 elements needed to fit cache line
+    size_t padding = std::max(elementsToFitL1, nmatrices); 
+    pvector< std::pair< RIT, RIT > > rowIdsRange(padding * nthreads); // Padding to avoid false sharing
 
     t0 = omp_get_wtime();
 #pragma omp parallel
     {
         double ttime = omp_get_wtime();
         std::vector<RIT> globalHashVec(minHashTableSize);
-        int tid = omp_get_thread_num();
+        size_t tid = omp_get_thread_num();
         if(tid == 0){
-            nthreads = omp_get_num_threads();
             ttimes.resize(nthreads);
             splitters.resize(nthreads);
             flopsPerThreadExpected = flopsTot / nthreads;
-            //printf("Expected flops per thread: %lld\n", flopsPerThreadExpected);
         }
 #pragma omp barrier
         splitters[tid] = std::lower_bound(prefixSumSymbolic.begin(), prefixSumSymbolic.end(), tid * flopsPerThreadExpected) - prefixSumSymbolic.begin();
-        //printf("splitters[%d] %d: target %lld\n", tid, splitters[tid], tid * flopsPerThreadExpected);
 #pragma omp barrier
 #pragma omp for schedule(static) nowait
-        for (int t = 0; t < nthreads; t++){
+        for (size_t t = 0; t < nthreads; t++){
             CPT colStart = splitters[t];
             CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
-            //printf("Thread %d processing %d columns: [%d, %d)\n", t, colEnd-colStart, colStart, colEnd);
             for(CPT i = colStart; i < colEnd; i++){
-                int64_t nwindows = nWindowPerColSymbolic[i];
-                RIT nrowsPerWindow = nrows / nwindows;
                 nnzPerCol[i] = 0;
                 nWindowPerCol[i] = 1;
-                RIT runningSum = 0;
-                for(size_t w=0; w < nwindows; w++){
-                    // Determine the start and end row index
-                    RIT rowStart = w * nrowsPerWindow;
-                    RIT rowEnd = (w == nwindows-1) ? nrows : (w+1) * nrowsPerWindow;
-                    
-                    int64_t wIdx = prefixSumWindowSymbolic[i] + w;
+                size_t nwindows = nWindowPerColSymbolic[i];
+                if (nwindows == 1){
+                    RIT rowStart = 0;
+                    RIT  rowEnd = nrows;
+                    size_t wIdx = prefixSumWindowSymbolic[i];
 
-                    nnzPerWindowSymbolic[wIdx].first = rowStart;
+                    nnzPerWindowSymbolic[wIdx].first = 0;
                     nnzPerWindowSymbolic[wIdx].second = 0;
 
-                    // Determine total number of input nonzeros in the window
-                    size_t flopsWindow = 0;
-                    for(int k = 0; k < nmatrices; k++){
-                        const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
-                        const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
-                        
-                        auto first = rowIds->begin();
-                        auto last = rowIds->end();
-                        int64_t startIdx, endIdx, midIdx;
-
-                        //t2 = omp_get_wtime();
-                        if(rowStart > 0){
-                            startIdx = (*colPtr)[i];
-                            endIdx = (*colPtr)[i+1];
-                            midIdx = (startIdx + endIdx) / 2;
-                            while(startIdx < endIdx){
-                                if((*rowIds)[midIdx] < rowStart) startIdx = midIdx + 1;
-                                else endIdx = midIdx;
-                                midIdx = (startIdx + endIdx) / 2;
-                            }
-                            first = rowIds->begin() + endIdx;
-                        }
-                        else{
-                            first = rowIds->begin() + (*colPtr)[i];
-                        }
-
-                        if(rowEnd < nrows){
-                            startIdx = (*colPtr)[i];
-                            endIdx = (*colPtr)[i+1];
-                            midIdx = (startIdx + endIdx) / 2;
-                            while(startIdx < endIdx){
-                                if((*rowIds)[midIdx] < rowEnd) startIdx = midIdx + 1;
-                                else endIdx = midIdx;
-                                midIdx = (startIdx + endIdx) / 2;
-                            }
-                            last = rowIds->begin() + endIdx;
-                        }
-                        else{
-                            last = rowIds->begin() + (*colPtr)[i+1];
-                        }
-                        //t3 = omp_get_wtime();
-                        //if(tid == 0) printf("custom lower bound: %lf\n", t3-t2);
-                        
-                        ////t2 = omp_get_wtime();
-                        //first = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
-                        //last = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
-                        ////t3 = omp_get_wtime();
-                        ////if(tid == 0) printf("default lower bound: %lf\n", t3-t2);
-                        
-                        //first = (rowStart == 0) ? rowIds->begin() + (*colPtr)[i] : std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
-                        //last = (rowEnd == nrows) ? rowIds->begin() + (*colPtr)[i+1] : std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
-
-                        flopsWindow += last-first;
-                    }
-                    
-                    // In worst case hash table may need to store all input nonzeros in the window
-                    // So resize the hash table accordingly
+                    size_t flopsWindow = flopsPerCol[i];
                     size_t htSize = minHashTableSize;
                     while(htSize < flopsWindow) //htSize is set as 2^n
                     {
@@ -878,54 +826,13 @@ pvector<RIT> symbolicSpMultiAddHashSliding2(std::vector<CSC<RIT, VT, CPT>* > &ma
                     for(size_t j=0; j < htSize; ++j){
                         globalHashVec[j] = -1;
                     }
-                    
-                    // For each matrix
-                    for(int k = 0; k < nmatrices; k++)
-                    {
+
+                    for(size_t k = 0; k < nmatrices; k++){
                         const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
                         const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
 
-                        auto first = rowIds->begin();
-                        auto last = rowIds->end();
-                        int64_t startIdx, endIdx, midIdx;
-
-                        //t2 = omp_get_wtime();
-                        if(rowStart > 0){
-                            startIdx = (*colPtr)[i];
-                            endIdx = (*colPtr)[i+1];
-                            midIdx = (startIdx + endIdx) / 2;
-                            while(startIdx < endIdx){
-                                if((*rowIds)[midIdx] < rowStart) startIdx = midIdx + 1;
-                                else endIdx = midIdx;
-                                midIdx = (startIdx + endIdx) / 2;
-                            }
-                            first = rowIds->begin() + endIdx;
-                        }
-                        else{
-                            first = rowIds->begin() + (*colPtr)[i];
-                        }
-
-                        if(rowEnd < nrows){
-                            startIdx = (*colPtr)[i];
-                            endIdx = (*colPtr)[i+1];
-                            midIdx = (startIdx + endIdx) / 2;
-                            while(startIdx < endIdx){
-                                if((*rowIds)[midIdx] < rowEnd) startIdx = midIdx + 1;
-                                else endIdx = midIdx;
-                                midIdx = (startIdx + endIdx) / 2;
-                            }
-                            last = rowIds->begin() + endIdx;
-                        }
-                        else{
-                            last = rowIds->begin() + (*colPtr)[i+1];
-                        }
-
-                        ////Determine the range of elements that fall within the window
-                        //first = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
-                        //last = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
-                        
-                        //first = (rowStart == 0) ? rowIds->begin() + (*colPtr)[i] : std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
-                        //last = (rowEnd == nrows) ? rowIds->begin() + (*colPtr)[i+1] : std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
+                        auto first = rowIds->begin() + (*colPtr)[i];
+                        auto last = rowIds->begin() + (*colPtr)[i+1];
                         
                         for(; first<last; first++){
                             RIT key = *first;
@@ -950,13 +857,114 @@ pvector<RIT> symbolicSpMultiAddHashSliding2(std::vector<CSC<RIT, VT, CPT>* > &ma
                             }
                         }
                     }
+                }
+                else{
+                    RIT nrowsPerWindow = nrows / nwindows;
+                    RIT runningSum = 0;
+                    for(size_t w = 0; w < nwindows; w++){
+                        RIT rowStart = w * nrowsPerWindow;
+                        RIT rowEnd = (w == nwindows-1) ? nrows : (w+1) * nrowsPerWindow;
 
-                    if(runningSum + nnzPerWindowSymbolic[wIdx].second > maxHashTableSize){
-                        runningSum = nnzPerWindowSymbolic[wIdx].second;
-                        nWindowPerCol[i]++;
-                    }
-                    else{
-                        runningSum += runningSum + nnzPerWindowSymbolic[wIdx].second;
+                        int64_t wIdx = prefixSumWindowSymbolic[i] + w;
+
+                        nnzPerWindowSymbolic[wIdx].first = rowStart;
+                        nnzPerWindowSymbolic[wIdx].second = 0;
+
+                        size_t flopsWindow = 0;
+
+                        for(int k = 0; k < nmatrices; k++){
+                            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                            const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+
+                            auto first = rowIds->begin() + (*colPtr)[i];
+                            auto last = rowIds->begin() + (*colPtr)[i+1];
+                            size_t startIdx, endIdx, midIdx;
+
+                            if(rowStart > 0){
+                                startIdx = (*colPtr)[i];
+                                endIdx = (*colPtr)[i+1];
+                                midIdx = (startIdx + endIdx) / 2;
+                                while(startIdx < endIdx){
+                                    if((*rowIds)[midIdx] < rowStart) startIdx = midIdx + 1;
+                                    else endIdx = midIdx;
+                                    midIdx = (startIdx + endIdx) / 2;
+                                }
+                                first = rowIds->begin() + endIdx;
+                                //first = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
+                            }
+
+                            if(rowEnd < nrows){
+                                startIdx = (*colPtr)[i];
+                                endIdx = (*colPtr)[i+1];
+                                midIdx = (startIdx + endIdx) / 2;
+                                while(startIdx < endIdx){
+                                    if((*rowIds)[midIdx] < rowEnd) startIdx = midIdx + 1;
+                                    else endIdx = midIdx;
+                                    midIdx = (startIdx + endIdx) / 2;
+                                }
+                                last = rowIds->begin() + endIdx;
+                                //last = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
+                            }
+                            rowIdsRange[tid * padding + k].first = first - rowIds->begin();
+                            rowIdsRange[tid * padding + k].second = last - rowIds->begin();
+
+                            flopsWindow += last-first;
+                        }
+
+                        size_t htSize = minHashTableSize;
+                        while(htSize < flopsWindow) //htSize is set as 2^n
+                        {
+                            htSize <<= 1;
+                        }
+                        if(globalHashVec.size() < htSize) globalHashVec.resize(htSize);
+                        for(size_t j=0; j < htSize; ++j){
+                            globalHashVec[j] = -1;
+                        }
+
+                        for(int k = 0; k < nmatrices; k++)
+                        {
+                            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                            const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+
+                            auto first = rowIds->begin() + rowIdsRange[tid  * padding + k].first;
+                            auto last = rowIds->begin() + rowIdsRange[tid * padding + k].second;
+                            
+                            for(; first<last; first++){
+                                RIT key = *first;
+                                RIT hash = (key*hashScale) & (htSize-1);
+                                while (1) //hash probing
+                                {
+                                    if (globalHashVec[hash] == key) //key is found in hash table
+                                    {
+                                        break;
+                                    }
+                                    else if (globalHashVec[hash] == -1) //key is not registered yet
+                                    {
+                                        globalHashVec[hash] = key;
+                                        nnzPerCol[i]++;
+                                        nnzPerWindowSymbolic[wIdx].second++;
+                                        break;
+                                    }
+                                    else //key is not found
+                                    {
+                                        hash = (hash+1) & (htSize-1);
+                                    }
+                                }
+                            }
+                        }
+                        if (w == 0){
+                            //nWindowPerCol[i] = 1;
+                            runningSum = nnzPerWindowSymbolic[wIdx].second;
+                        }
+                        else{
+                            if(runningSum + nnzPerWindowSymbolic[wIdx].second > maxHashTableSize){
+                                nWindowPerCol[i]++;
+                                runningSum = nnzPerWindowSymbolic[wIdx].second;
+                            }
+                            else{
+                                runningSum = runningSum + nnzPerWindowSymbolic[wIdx].second;
+                            }
+                        }
                     }
                 }
             }
@@ -965,14 +973,10 @@ pvector<RIT> symbolicSpMultiAddHashSliding2(std::vector<CSC<RIT, VT, CPT>* > &ma
         ttimes[tid] = ttime;
     }
     t1 = omp_get_wtime();
-    printf("[symbolic sliding hash]\tTime for parallel section: %lf\n", t1-t0);
-    printf("[symbolic sliding hash]\tstats for parallel section time:\n");
-    getStats<double>(ttimes, true);
-    printf("***\n\n");
-
-    printf("[sliding hash] stats of number of window per column\n");
-    getStats<RIT>(nWindowPerCol, true);
-    printf("***\n\n");
+    //printf("[Sliding Hash]\tTime for symbolic: %lf\n", t1-t0);
+    //printf("[Sliding Hash]\tStats of time consumed by threads:\n");
+    //getStats<double>(ttimes, true);
+    //printf("---\n");
 
     return std::move(nnzPerCol);
 }
@@ -1123,10 +1127,10 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pv
 #pragma omp barrier
     }
     t1 = omp_get_wtime();
-    printf("[Hash]\tTime for parallel section: %lf\n", t1-t0);
-    printf("[Hash]\tStats for parallel section timing:\n");
-    getStats<double>(ttimes, true);
-    printf("***\n\n");
+    //printf("[Hash]\tTime for parallel section: %lf\n", t1-t0);
+    //printf("[Hash]\tStats for parallel section timing:\n");
+    //getStats<double>(ttimes, true);
+    //printf("***\n\n");
 
     Timer clock;
     clock.Start();
@@ -1810,7 +1814,6 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid3(std::vector<CSC<RIT, VT, CPT>* > & matrices,
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
 CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices, bool sorted=true)
 {
-    
     double t0, t1, t2, t3, t4, t5;
 
     t0 = omp_get_wtime();
@@ -1830,131 +1833,83 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
     pvector<double> ttimes; // To record time taken by each thread
     pvector<CPT> splitters; // To store load balance friendly split of columns accross threads;
 
-    pvector<int64_t> flopsPerCol(ncols);
-    pvector<int64_t> nWindowPerColSymbolic(ncols); 
+    pvector<size_t> flopsPerCol(ncols);
+    pvector<size_t> nWindowPerColSymbolic(ncols); 
     pvector<RIT> nWindowPerCol(ncols); 
     pvector<RIT> nnzPerCol(ncols, 0);
 
     t2 = omp_get_wtime();
-#pragma omp parallel for
-    for(CPT i = 0; i < ncols; i++){
-        flopsPerCol[i] = 0;
-        for(int k = 0; k < nmatrices; k++){
-            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
-            flopsPerCol[i] += (*colPtr)[i+1] - (*colPtr)[i];
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
         }
-        nWindowPerColSymbolic[i] = flopsPerCol[i] / maxHashTableSizeSymbolic + 1;
+#pragma omp for
+        for(CPT i = 0; i < ncols; i++){
+            flopsPerCol[i] = 0;
+            for(int k = 0; k < nmatrices; k++){
+                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                flopsPerCol[i] += (*colPtr)[i+1] - (*colPtr)[i];
+            }
+            nWindowPerColSymbolic[i] = (flopsPerCol[i] / maxHashTableSizeSymbolic) + 1;
+        }
     }
     t3 = omp_get_wtime();
-    //printf("[Hybrid4]\tTime for number of window calculation: %lf\n", t3-t2);
-    
 
-    pvector<int64_t> prefixSumSymbolic(ncols+1, 0);
+    pvector<size_t> prefixSumSymbolic(ncols+1, 0);
     ParallelPrefixSum(flopsPerCol, prefixSumSymbolic);
 
-    pvector<int64_t> prefixSumWindowSymbolic(ncols+1, 0);
+    pvector<size_t> prefixSumWindowSymbolic(ncols+1, 0);
     ParallelPrefixSum(nWindowPerColSymbolic, prefixSumWindowSymbolic);
 
     pvector < std::pair<RIT, RIT> > nnzPerWindowSymbolic(prefixSumWindowSymbolic[ncols]);
     
-    int64_t flopsTot = prefixSumSymbolic[ncols];
-    int64_t flopsPerThreadExpected;
+    size_t flopsTot = prefixSumSymbolic[ncols];
+    size_t flopsPerThreadExpected;
     
     t1 = omp_get_wtime();
     //printf("[Sliding Hash]\tTime before symbolic: %lf\n", t1-t0);
     
     //printf("[Sliding Hash]\tStats of number of windows of symbolic:\n");
     //getStats<int64_t>(nWindowPerColSymbolic, true);
+    
+    size_t cacheL1 = 32 * 1024;
+    size_t elementsToFitL1 = cacheL1 / sizeof( std::pair<RIT,RIT> ); // 32KB L1 cache / 8B element size = 4096 elements needed to fit cache line
+    size_t padding = std::max(elementsToFitL1, nmatrices); 
+    pvector< std::pair< RIT, RIT > > rowIdsRange(padding * nthreads); // Padding to avoid false sharing
 
     t0 = omp_get_wtime();
 #pragma omp parallel
     {
         double ttime = omp_get_wtime();
         std::vector<RIT> globalHashVec(minHashTableSize);
-        int tid = omp_get_thread_num();
+        size_t tid = omp_get_thread_num();
         if(tid == 0){
-            nthreads = omp_get_num_threads();
             ttimes.resize(nthreads);
             splitters.resize(nthreads);
             flopsPerThreadExpected = flopsTot / nthreads;
-            //printf("Expected flops per thread: %lld\n", flopsPerThreadExpected);
         }
 #pragma omp barrier
         splitters[tid] = std::lower_bound(prefixSumSymbolic.begin(), prefixSumSymbolic.end(), tid * flopsPerThreadExpected) - prefixSumSymbolic.begin();
-        //printf("splitters[%d] %d: target %lld\n", tid, splitters[tid], tid * flopsPerThreadExpected);
 #pragma omp barrier
 #pragma omp for schedule(static) nowait
-        for (int t = 0; t < nthreads; t++){
+        for (size_t t = 0; t < nthreads; t++){
             CPT colStart = splitters[t];
             CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
-            //printf("Thread %d processing %d columns: [%d, %d)\n", t, colEnd-colStart, colStart, colEnd);
             for(CPT i = colStart; i < colEnd; i++){
-                size_t nwindows = nWindowPerColSymbolic[i];
-                RIT nrowsPerWindow = nrows / nwindows;
                 nnzPerCol[i] = 0;
-                nWindowPerCol[i] = 0;
-                RIT runningSum = 0;
-                for(size_t w=0; w < nwindows; w++){
-                    // Determine the start and end row index
-                    RIT rowStart = w * nrowsPerWindow;
-                    RIT rowEnd = (w == nwindows-1) ? nrows : (w+1) * nrowsPerWindow;
-                    
-                    int64_t wIdx = prefixSumWindowSymbolic[i] + w;
+                nWindowPerCol[i] = 1;
+                size_t nwindows = nWindowPerColSymbolic[i];
+                if (nwindows == 1){
+                    RIT rowStart = 0;
+                    RIT  rowEnd = nrows;
+                    size_t wIdx = prefixSumWindowSymbolic[i];
 
-                    nnzPerWindowSymbolic[wIdx].first = rowStart;
+                    nnzPerWindowSymbolic[wIdx].first = 0;
                     nnzPerWindowSymbolic[wIdx].second = 0;
 
-                    // Determine total number of input nonzeros in the window
-                    size_t flopsWindow = 0;
-                    for(int k = 0; k < nmatrices; k++){
-                        const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
-                        const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
-
-                        auto first = rowIds->begin();
-                        auto last = rowIds->end();
-                        int64_t startIdx, endIdx, midIdx;
-
-                        //t2 = omp_get_wtime();
-                        if(rowStart > 0){
-                            startIdx = (*colPtr)[i];
-                            endIdx = (*colPtr)[i+1];
-                            midIdx = (startIdx + endIdx) / 2;
-                            while(startIdx < endIdx){
-                                if((*rowIds)[midIdx] < rowStart) startIdx = midIdx + 1;
-                                else endIdx = midIdx;
-                                midIdx = (startIdx + endIdx) / 2;
-                            }
-                            first = rowIds->begin() + endIdx;
-                        }
-                        else{
-                            first = rowIds->begin() + (*colPtr)[i];
-                        }
-
-                        if(rowEnd < nrows){
-                            startIdx = (*colPtr)[i];
-                            endIdx = (*colPtr)[i+1];
-                            midIdx = (startIdx + endIdx) / 2;
-                            while(startIdx < endIdx){
-                                if((*rowIds)[midIdx] < rowEnd) startIdx = midIdx + 1;
-                                else endIdx = midIdx;
-                                midIdx = (startIdx + endIdx) / 2;
-                            }
-                            last = rowIds->begin() + endIdx;
-                        }
-                        else{
-                            last = rowIds->begin() + (*colPtr)[i+1];
-                        }
-                       
-                        //first = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
-                        //last = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
-                        //first = (rowStart == 0) ? rowIds->begin() + (*colPtr)[i] : std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
-                        //last = (rowEnd == nrows) ? rowIds->begin() + (*colPtr)[i+1] : std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
-
-                        flopsWindow += last-first;
-                    }
-                    
-                    // In worst case hash table may need to store all input nonzeros in the window
-                    // So resize the hash table accordingly
+                    size_t flopsWindow = flopsPerCol[i];
                     size_t htSize = minHashTableSize;
                     while(htSize < flopsWindow) //htSize is set as 2^n
                     {
@@ -1964,53 +1919,13 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
                     for(size_t j=0; j < htSize; ++j){
                         globalHashVec[j] = -1;
                     }
-                    
-                    // For each matrix
-                    for(int k = 0; k < nmatrices; k++)
-                    {
+
+                    for(size_t k = 0; k < nmatrices; k++){
                         const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
                         const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
 
-                        auto first = rowIds->begin();
-                        auto last = rowIds->end();
-                        int64_t startIdx, endIdx, midIdx;
-
-                        //t2 = omp_get_wtime();
-                        if(rowStart > 0){
-                            startIdx = (*colPtr)[i];
-                            endIdx = (*colPtr)[i+1];
-                            midIdx = (startIdx + endIdx) / 2;
-                            while(startIdx < endIdx){
-                                if((*rowIds)[midIdx] < rowStart) startIdx = midIdx + 1;
-                                else endIdx = midIdx;
-                                midIdx = (startIdx + endIdx) / 2;
-                            }
-                            first = rowIds->begin() + endIdx;
-                        }
-                        else{
-                            first = rowIds->begin() + (*colPtr)[i];
-                        }
-
-                        if(rowEnd < nrows){
-                            startIdx = (*colPtr)[i];
-                            endIdx = (*colPtr)[i+1];
-                            midIdx = (startIdx + endIdx) / 2;
-                            while(startIdx < endIdx){
-                                if((*rowIds)[midIdx] < rowEnd) startIdx = midIdx + 1;
-                                else endIdx = midIdx;
-                                midIdx = (startIdx + endIdx) / 2;
-                            }
-                            last = rowIds->begin() + endIdx;
-                        }
-                        else{
-                            last = rowIds->begin() + (*colPtr)[i+1];
-                        }
-
-                        // Determine the range of elements that fall within the window
-                        //first = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
-                        //last = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
-                        //first = (rowStart == 0) ? rowIds->begin() + (*colPtr)[i] : std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
-                        //last = (rowEnd == nrows) ? rowIds->begin() + (*colPtr)[i+1] : std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
+                        auto first = rowIds->begin() + (*colPtr)[i];
+                        auto last = rowIds->begin() + (*colPtr)[i+1];
                         
                         for(; first<last; first++){
                             RIT key = *first;
@@ -2035,17 +1950,113 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
                             }
                         }
                     }
-                    if (w == 0){
-                        nWindowPerCol[i] = 1;
-                        runningSum = nnzPerWindowSymbolic[wIdx].second;
-                    }
-                    else{
-                        if(runningSum + nnzPerWindowSymbolic[wIdx].second > maxHashTableSize){
+                }
+                else{
+                    RIT nrowsPerWindow = nrows / nwindows;
+                    RIT runningSum = 0;
+                    for(size_t w = 0; w < nwindows; w++){
+                        RIT rowStart = w * nrowsPerWindow;
+                        RIT rowEnd = (w == nwindows-1) ? nrows : (w+1) * nrowsPerWindow;
+
+                        int64_t wIdx = prefixSumWindowSymbolic[i] + w;
+
+                        nnzPerWindowSymbolic[wIdx].first = rowStart;
+                        nnzPerWindowSymbolic[wIdx].second = 0;
+
+                        size_t flopsWindow = 0;
+
+                        for(int k = 0; k < nmatrices; k++){
+                            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                            const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+
+                            auto first = rowIds->begin() + (*colPtr)[i];
+                            auto last = rowIds->begin() + (*colPtr)[i+1];
+                            size_t startIdx, endIdx, midIdx;
+
+                            if(rowStart > 0){
+                                startIdx = (*colPtr)[i];
+                                endIdx = (*colPtr)[i+1];
+                                midIdx = (startIdx + endIdx) / 2;
+                                while(startIdx < endIdx){
+                                    if((*rowIds)[midIdx] < rowStart) startIdx = midIdx + 1;
+                                    else endIdx = midIdx;
+                                    midIdx = (startIdx + endIdx) / 2;
+                                }
+                                first = rowIds->begin() + endIdx;
+                                //first = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
+                            }
+
+                            if(rowEnd < nrows){
+                                startIdx = (*colPtr)[i];
+                                endIdx = (*colPtr)[i+1];
+                                midIdx = (startIdx + endIdx) / 2;
+                                while(startIdx < endIdx){
+                                    if((*rowIds)[midIdx] < rowEnd) startIdx = midIdx + 1;
+                                    else endIdx = midIdx;
+                                    midIdx = (startIdx + endIdx) / 2;
+                                }
+                                last = rowIds->begin() + endIdx;
+                                //last = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
+                            }
+                            rowIdsRange[tid * padding + k].first = first - rowIds->begin();
+                            rowIdsRange[tid * padding + k].second = last - rowIds->begin();
+
+                            flopsWindow += last-first;
+                        }
+
+                        size_t htSize = minHashTableSize;
+                        while(htSize < flopsWindow) //htSize is set as 2^n
+                        {
+                            htSize <<= 1;
+                        }
+                        if(globalHashVec.size() < htSize) globalHashVec.resize(htSize);
+                        for(size_t j=0; j < htSize; ++j){
+                            globalHashVec[j] = -1;
+                        }
+
+                        for(int k = 0; k < nmatrices; k++)
+                        {
+                            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                            const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+
+                            auto first = rowIds->begin() + rowIdsRange[tid  * padding + k].first;
+                            auto last = rowIds->begin() + rowIdsRange[tid * padding + k].second;
+                            
+                            for(; first<last; first++){
+                                RIT key = *first;
+                                RIT hash = (key*hashScale) & (htSize-1);
+                                while (1) //hash probing
+                                {
+                                    if (globalHashVec[hash] == key) //key is found in hash table
+                                    {
+                                        break;
+                                    }
+                                    else if (globalHashVec[hash] == -1) //key is not registered yet
+                                    {
+                                        globalHashVec[hash] = key;
+                                        nnzPerCol[i]++;
+                                        nnzPerWindowSymbolic[wIdx].second++;
+                                        break;
+                                    }
+                                    else //key is not found
+                                    {
+                                        hash = (hash+1) & (htSize-1);
+                                    }
+                                }
+                            }
+                        }
+                        if (w == 0){
+                            //nWindowPerCol[i] = 1;
                             runningSum = nnzPerWindowSymbolic[wIdx].second;
-                            nWindowPerCol[i]++;
                         }
                         else{
-                            runningSum = runningSum + nnzPerWindowSymbolic[wIdx].second;
+                            if(runningSum + nnzPerWindowSymbolic[wIdx].second > maxHashTableSize){
+                                nWindowPerCol[i]++;
+                                runningSum = nnzPerWindowSymbolic[wIdx].second;
+                            }
+                            else{
+                                runningSum = runningSum + nnzPerWindowSymbolic[wIdx].second;
+                            }
                         }
                     }
                 }
@@ -2055,17 +2066,13 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
         ttimes[tid] = ttime;
     }
     t1 = omp_get_wtime();
-    printf("[Sliding Hash]\tTime for symbolic: %lf\n", t1-t0);
-    printf("[Sliding Hash]\tStats of time consumed by threads:\n");
-    getStats<double>(ttimes, true);
-    printf("---\n");
+    //printf("[Sliding Hash]\tTime for symbolic: %lf\n", t1-t0);
+    //printf("[Sliding Hash]\tStats of time consumed by threads:\n");
+    //getStats<double>(ttimes, true);
+    //printf("---\n");
     
     pvector<RIT> prefixSumWindow(ncols+1, 0);
     ParallelPrefixSum(nWindowPerCol, prefixSumWindow);
-
-    //for(CPT i = 0; i < ncols; i++){
-        //printf("%d -> %d\n", nWindowPerColSymbolic[i], nWindowPerCol[i]);
-    //}
 
     //printf("[Sliding Hash]\tStats of number of windows:\n");
     //getStats<RIT>(nWindowPerCol, true);
@@ -2073,7 +2080,7 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
     pvector< std::pair<RIT, RIT> > nnzPerWindow(prefixSumWindow[ncols]);
     
     t0 = omp_get_wtime();
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static)
     for(int t = 0; t < nthreads; t++){
         CPT colStart = splitters[t];
         CPT colEnd = (t < nthreads-1) ? splitters[t+1] : ncols;
@@ -2127,10 +2134,6 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
     CPT nnzCTot = prefixSum[ncols];
     CPT nnzCPerThreadExpected = nnzCTot / nthreads;
     
-    size_t cacheL1 = 32 * 1024;
-    size_t elementsToFitL1 = cacheL1 / sizeof( std::pair<RIT,RIT> );
-    size_t padding = std::max(elementsToFitL1, nmatrices); // 32KB L1 cache / 8B element size = 4096 elements needed to fit cache line
-    pvector< std::pair< RIT, RIT > > rowIdsRange(padding * nthreads); // Padding to avoid false sharing
     
     t0 = omp_get_wtime();
 #pragma omp parallel
@@ -2293,10 +2296,10 @@ CSC<RIT, VT, CPT> SpMultiAddHybrid4(std::vector<CSC<RIT, VT, CPT>* > & matrices,
 #pragma omp barrier
     }
     t1 = omp_get_wtime();
-    printf("[Sliding Hash]\tTime for computation: %lf\n", t1-t0);
-    printf("[Sliding Hash]\tStats of parallel section timings:\n");
-    getStats<double>(ttimes, true);
-    printf("***\n\n");
+    //printf("[Sliding Hash]\tTime for computation: %lf\n", t1-t0);
+    //printf("[Sliding Hash]\tStats of parallel section timings:\n");
+    //getStats<double>(ttimes, true);
+    //printf("***\n\n");
 
     sumMat.nz_rows_pvector(&CrowIds);
     sumMat.nz_vals_pvector(&CnzVals);
