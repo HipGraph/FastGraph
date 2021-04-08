@@ -28,6 +28,7 @@ int main(int argc, char* argv[]){
     //}
 
 	std::vector< CSC<int32_t, int32_t, int32_t>* > vec;
+    std::vector< CSC<int32_t, int32_t, int32_t>* > vec_temp;
 
     // below is method to use random matrices from COO.h
     for(int i = 0; i < k; i++){
@@ -39,6 +40,7 @@ int main(int argc, char* argv[]){
             coo.GenRMAT(x,y,weighted, i);   //(x,y,true) Generate a weighted RMAT matrix with 2^x rows and columns and y nonzeros per column
         }
         vec.push_back(new CSC<int32_t, int32_t, int32_t>(coo));
+        //vec_temp.push_back(new CSC<int32_t, int32_t, int32_t>(coo));
         //vec[i]->print_all();
     }
     
@@ -140,18 +142,20 @@ int main(int argc, char* argv[]){
 
     //std::vector<int> threads{1, 6, 12, 24, 48};
     //std::vector<int> threads{1, 16, 48};
-    std::vector<int> threads{1, 12, 24};
-    //std::vector<int> threads{24};
+    std::vector<int> threads{48, 1, 12};
+    //std::vector<int> threads{12};
+
+    int iterations = 1;
 
     for(int i = 0; i < threads.size(); i++){
         omp_set_num_threads(threads[i]);
         mkl_set_num_threads(threads[i]);
-        //std::cout << ">>> Using " << threads[i] << " threads" << std::endl;
 
         //clock.Start();
         //for(int j = 1; j < k; j++){
             //sparse_status_t add_status;
-            ////printf("Adding matrix %d: ", j);
+            //sparse_status_t destroy_status;
+            //printf("Adding matrix %d: ", j);
             //if(j == 1){
                 //add_status = mkl_sparse_d_add(
                     //SPARSE_OPERATION_NON_TRANSPOSE, 
@@ -160,6 +164,7 @@ int main(int argc, char* argv[]){
                     //mkl_csr_matrices[j], 
                     //&(mkl_sums[j])
                 //);
+                //destroy_status = mkl_sparse_destroy(mkl_sums[j-1]);
             //}
             //else{
                 //add_status = mkl_sparse_d_add(
@@ -169,17 +174,18 @@ int main(int argc, char* argv[]){
                     //mkl_csr_matrices[j], 
                     //&(mkl_sums[j])
                 //);
+                //destroy_status = mkl_sparse_destroy(mkl_sums[j-1]);
             //}
-            ////switch(add_status){
-                ////case SPARSE_STATUS_SUCCESS: printf("SPARSE_STATUS_SUCCESS"); break;
-                ////case SPARSE_STATUS_NOT_INITIALIZED: printf("SPARSE_STATUS_NOT_INITIALIZED"); break;
-                ////case SPARSE_STATUS_ALLOC_FAILED: printf("SPARSE_STATUS_ALLOC_FAILED"); break;
-                ////case SPARSE_STATUS_INVALID_VALUE: printf("SPARSE_STATUS_INVALID_VALUE"); break;
-                ////case SPARSE_STATUS_EXECUTION_FAILED: printf("SPARSE_STATUS_EXECUTION_FAILED"); break;
-                ////case SPARSE_STATUS_INTERNAL_ERROR: printf("SPARSE_STATUS_INTERNAL_ERROR"); break;
-                ////case SPARSE_STATUS_NOT_SUPPORTED: printf("SPARSE_STATUS_NOT_SUPPORTED"); break;
-            ////}
-            ////printf("\n");
+            //switch(add_status){
+                //case SPARSE_STATUS_SUCCESS: printf("SPARSE_STATUS_SUCCESS"); break;
+                //case SPARSE_STATUS_NOT_INITIALIZED: printf("SPARSE_STATUS_NOT_INITIALIZED"); break;
+                //case SPARSE_STATUS_ALLOC_FAILED: printf("SPARSE_STATUS_ALLOC_FAILED"); break;
+                //case SPARSE_STATUS_INVALID_VALUE: printf("SPARSE_STATUS_INVALID_VALUE"); break;
+                //case SPARSE_STATUS_EXECUTION_FAILED: printf("SPARSE_STATUS_EXECUTION_FAILED"); break;
+                //case SPARSE_STATUS_INTERNAL_ERROR: printf("SPARSE_STATUS_INTERNAL_ERROR"); break;
+                //case SPARSE_STATUS_NOT_SUPPORTED: printf("SPARSE_STATUS_NOT_SUPPORTED"); break;
+            //}
+            //printf("\n");
         //}
         //clock.Stop();
         ////std::cout << "time for MKL in seconds " << clock.Seconds() << std::endl;
@@ -195,16 +201,84 @@ int main(int argc, char* argv[]){
         //std::cout << threads[i] << ",";
         //std::cout << "mkl_sparse_d_add" << ","; 
         //std::cout << clock.Seconds() << std::endl;
+
+        //sparse_matrix_t* mkl_temp = (sparse_matrix_t*) malloc( 1 * sizeof(sparse_matrix_t) );
+        //double mkl_time = 0;
+        //matrix_descr desc;
+        //desc.type = SPARSE_MATRIX_TYPE_GENERAL;
+        //for(int u = 0; u < k; u++){
+            //if(mkl_sums[u] != NULL){
+                //mkl_sparse_destroy(mkl_sums[u]);
+            //}
+        //}
+        //free(mkl_sums);
+        //mkl_sums = (sparse_matrix_t*) malloc( k * sizeof(sparse_matrix_t) );
+        //for(int u = 0; u < k; u++){
+            //mkl_sums[u] = NULL;
+        //}
+        //int nIntermediate = k;
+        //while(nIntermediate > 1){
+            ////printf("MKL pairwise tree intermediate %d\n", nIntermediate);
+            //int j = 0;
+            //int idxf = j * 2 + 0;
+            //int idxs = idxf;
+            //if(idxs + 1 < nIntermediate) idxs++;
+            //while(idxs < nIntermediate){
+                //if(idxf < idxs){
+                    //clock.Start();
+                    //mkl_sparse_d_add(
+                        //SPARSE_OPERATION_NON_TRANSPOSE, 
+                        //mkl_csr_matrices[idxf], 
+                        //1.0, 
+                        //mkl_csr_matrices[idxs], 
+                        //mkl_temp
+                    //);
+                    //clock.Stop();
+                    //mkl_time += clock.Seconds();
+                    //mkl_sparse_destroy(mkl_csr_matrices[idxf]);
+                    //mkl_sparse_destroy(mkl_csr_matrices[idxs]);
+                    //mkl_sparse_copy(*mkl_temp, desc, &(mkl_csr_matrices[j]));
+                    //mkl_sparse_destroy(*mkl_temp);
+                //}
+                //else{
+                    //clock.Start();
+                    //mkl_sparse_copy(mkl_csr_matrices[idxf], desc, mkl_temp);
+                    //clock.Stop();
+                    ////mkl_time += clock.Seconds();
+                    //mkl_sparse_destroy(mkl_csr_matrices[idxf]);
+                    //mkl_sparse_copy(*mkl_temp, desc, &(mkl_csr_matrices[j]));
+                    //mkl_sparse_destroy(*mkl_temp);
+                //}
+                //j++;
+                //idxf = j * 2 + 0;
+                //idxs = idxf;
+                //if(idxs + 1 < nIntermediate) idxs++;
+            //}
+            //nIntermediate = j;
+        //}
+        //if(type == 0){
+            //std::cout << "ER" << "," ;
+        //}
+        //else{
+            //std::cout << "RMAT" << "," ;
+        //}
+        //std::cout << x << "," ;
+        //std::cout << y << "," ;
+        //std::cout << k << "," ;
+        //std::cout << threads[i] << ",";
+        //std::cout << "MKL" << ","; 
+        //std::cout << mkl_time << std::endl;
         
         CSC<int32_t, int32_t, int32_t> SpAddHash_out;
 
+        //CSC<int32_t, int32_t, int32_t> OutPairwiseLinear;
         //clock.Start();
         //std::vector<size_t> intermediate_nnz;
-        //CSC<int32_t, int32_t, int32_t> SpAddHash_out = SpAdd<int32_t,int32_t, int32_t,int32_t> (vec[0], vec[1]);
-        //intermediate_nnz.push_back(SpAddHash_out.get_nnz());
+        //OutPairwiseLinear = SpAdd<int32_t,int32_t, int32_t,int32_t> (vec[0], vec[1]);
+        ////intermediate_nnz.push_back(OutPairwiseLinear.get_nnz());
         //for (int j = 2; j < k; j++){
-            //SpAddHash_out = SpAdd<int32_t,int32_t,int32_t,int32_t>(&SpAddHash_out, vec[j]);
-            //intermediate_nnz.push_back(SpAddHash_out.get_nnz());
+            //OutPairwiseLinear = SpAdd<int32_t,int32_t,int32_t,int32_t>(&OutPairwiseLinear, vec[j]);
+            ////intermediate_nnz.push_back(OutPairwiseLinear.get_nnz());
         //}
         //clock.Stop();
         //if(type == 0){
@@ -217,36 +291,120 @@ int main(int argc, char* argv[]){
         //std::cout << y << "," ;
         //std::cout << k << "," ;
         //std::cout << threads[i] << ",";
-        //std::cout << "SpAdd" << ","; 
+        //std::cout << "SpAddPairwiseLinear" << ","; 
         //std::cout << clock.Seconds() << std::endl;
-        ////std::cout<<"time for SpAdd function in seconds = "<< clock.Seconds()<<std::endl;
-        ////std::ofstream fp;
-        ////fp.open("pairwise-spadd.txt", std::ios::trunc);
-        ////for (int j = 0 ; j < intermediate_nnz.size(); j++){
-            ////fp << intermediate_nnz[j] << std::endl;
-        ////}
-        ////fp.close();
+
+        //std::vector< CSC<int32_t, int32_t, int32_t>* > tree(vec.begin(), vec.end());
+        ////std::vector< CSC<int32_t, int32_t, int32_t>* > tree(vec_temp.begin(), vec_temp.end());
+        //CSC<int32_t, int32_t, int32_t> * temp1;
+        //CSC<int32_t, int32_t, int32_t> * temp2;
+        //int nIntermediate = tree.size();
+        //double pairwise_time = 0;
+        //while(nIntermediate > 1){
+            //int j = 0;
+            //int idxf = j * 2 + 0;
+            //int idxs = idxf;
+            //if(idxs + 1 < nIntermediate) idxs++;
+            //while(idxs < nIntermediate){
+                //if(idxf < idxs){
+                    //temp1 = tree[idxf];
+                    //temp2 = tree[idxs];
+                    //clock.Start();
+                    //pvector<int32_t> nnzCPerCol = symbolicSpAddRegular<int32_t,int32_t,int32_t,int32_t>(tree[idxf], tree[idxs]);
+                    //tree[j] = new CSC<int32_t, int32_t, int32_t>(SpAddRegular<int32_t,int32_t,int32_t,int32_t>(tree[idxf], tree[idxs], nnzCPerCol));
+                    //clock.Stop();
+                    //pairwise_time += clock.Seconds();
+                    //delete temp1;
+                    //delete temp2;
+                //}
+                //else{
+                    //tree[j] = tree[idxf];
+                //}
+                //j++;
+                //idxf = j * 2 + 0;
+                //idxs = idxf;
+                //if(idxs + 1 < nIntermediate) idxs++;
+            //}
+            //nIntermediate = j;
+        //}
+        //if(type == 0){
+            //std::cout << "ER" << "," ;
+        //}
+        //else{
+            //std::cout << "RMAT" << "," ;
+        //}
+        //std::cout << x << "," ;
+        //std::cout << y << "," ;
+        //std::cout << k << "," ;
+        //std::cout << threads[i] << ",";
+        //std::cout << "SpAddPairwiseTree" << ","; 
+        //std::cout << pairwise_time << std::endl;
+        
+        //clock.Start(); 
+        //pvector<int32_t> nnzCPerCol = symbolicSpMultiAddHash<int32_t, int32_t, int32_t, int32_t, int32_t>(vec);
+        //SpAddHash_out = SpMultiAddHash<int32_t,int32_t, int32_t,int32_t> (vec, nnzCPerCol, true);
+        //clock.Stop();
+        //if(type == 0){
+            //std::cout << "ER" << "," ;
+        //}
+        //else{
+            //std::cout << "RMAT" << "," ;
+        //}
+        //std::cout << x << "," ;
+        //std::cout << y << "," ;
+        //std::cout << k << "," ;
+        //std::cout << threads[i] << ",";
+        //std::cout << "SpMultiAddHash" << ","; 
+        //std::cout << clock.Seconds() << std::endl;
         ////SpAddHash_out.print_all();
         
-        clock.Start(); 
-        SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,0);
-        clock.Stop();
-        if(type == 0){
-            std::cout << "ER" << "," ;
+        //double sliding_time = 0;
+        //for(int it = 0; it < iterations; it++){
+            //clock.Start(); 
+            //CSC<int32_t, int32_t, int32_t> SpAddHybrid_out = SpMultiAddHashSliding<int32_t,int32_t, int32_t,int32_t> (vec, 512, 512, false);
+            //clock.Stop();
+            //sliding_time += clock.Seconds();
+            //if(type == 0){
+                //std::cout << "ER" << "," ;
+            //}
+            //else{
+                //std::cout << "RMAT" << "," ;
+            //}
+            //std::cout << x << "," ;
+            //std::cout << y << "," ;
+            //std::cout << k << "," ;
+            //std::cout << threads[i] << ",";
+            //std::cout << "SpMultiAddHashSliding" << ","; 
+            //std::cout << clock.Seconds() << std::endl;
+            ////std::cout << SpAddHybrid_out.get_nnz() << std::endl;
+            ////SpAddHybrid_out.print_all();
+        //}
+
+        double spa_time = 0;
+        CSC<int32_t, int32_t, int32_t> SpAddSpA_out;
+        for(int it = 0; it < iterations; it++){
+            clock.Start(); 
+            SpAddSpA_out = SpMultiAddSpA<int32_t,int32_t, int32_t,int32_t> (vec);
+            clock.Stop();
+            spa_time += clock.Seconds();
+            if(type == 0){
+                std::cout << "ER" << "," ;
+            }
+            else{
+                std::cout << "RMAT" << "," ;
+            }
+            std::cout << x << "," ;
+            std::cout << y << "," ;
+            std::cout << k << "," ;
+            std::cout << threads[i] << ",";
+            std::cout << "SpMultiAddSpA" << ","; 
+            std::cout << clock.Seconds() << std::endl;
+            //std::cout << SpAddHybrid_out.get_nnz() << std::endl;
+            //SpAddHybrid_out.print_all();
         }
-        else{
-            std::cout << "RMAT" << "," ;
-        }
-        std::cout << x << "," ;
-        std::cout << y << "," ;
-        std::cout << k << "," ;
-        std::cout << threads[i] << ",";
-        std::cout << "SpMultiAddHash" << ","; 
-        std::cout << clock.Seconds() << std::endl;
-        //SpAddHash_out.print_all();
         
         //clock.Start(); 
-        //SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,1);
+        //CSC<int32_t, int32_t, int32_t> SpAddHeap_out = SpMultiAddHeap<int32_t,int32_t, int32_t,int32_t, int32_t> (vec);
         //clock.Stop();
         //if(type == 0){
             //std::cout << "ER" << "," ;
@@ -258,79 +416,10 @@ int main(int argc, char* argv[]){
         //std::cout << y << "," ;
         //std::cout << k << "," ;
         //std::cout << threads[i] << ",";
-        //std::cout << "SpMultiAddHybrid" << ","; 
+        //std::cout << "SpMultiAddHeap" << ","; 
         //std::cout << clock.Seconds() << std::endl;
-
-        //clock.Start(); 
-        //SpAddHash_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,2);
-        //clock.Stop();
-        //if(type == 0){
-            //std::cout << "ER" << "," ;
-        //}
-        //else{
-            //std::cout << "RMAT" << "," ;
-        //}
-        //std::cout << x << "," ;
-        //std::cout << y << "," ;
-        //std::cout << k << "," ;
-        //std::cout << threads[i] << ",";
-        //std::cout << "SpMultiAddHybrid2" << ","; 
-        //std::cout << clock.Seconds() << std::endl;
-
-        clock.Start(); 
-        CSC<int32_t, int32_t, int32_t> SpAddHybrid_out = SpMultiAdd<int32_t,int32_t, int32_t,int32_t> (vec,4);
-        clock.Stop();
-        if(type == 0){
-            std::cout << "ER" << "," ;
-        }
-        else{
-            std::cout << "RMAT" << "," ;
-        }
-        std::cout << x << "," ;
-        std::cout << y << "," ;
-        std::cout << k << "," ;
-        std::cout << threads[i] << ",";
-        std::cout << "SpMultiAddHashSliding" << ","; 
-        std::cout << clock.Seconds() << std::endl;
-        //SpAddHybrid_out.print_all();
-
-        //auto SpAddHash_colPtr = SpAddHash_out.get_colPtr();
-        //auto SpAddHash_rowIds = SpAddHash_out.get_rowIds();
-        //auto SpAddHash_nzVals = SpAddHash_out.get_nzVals();
-        //auto SpAddHash_ncols = SpAddHash_out.get_ncols();
-        //auto SpAddHash_nrows = SpAddHash_out.get_nrows();
-        //auto SpAddHybrid_colPtr = SpAddHybrid_out.get_colPtr();
-        //auto SpAddHybrid_rowIds = SpAddHybrid_out.get_rowIds();
-        //auto SpAddHybrid_nzVals = SpAddHybrid_out.get_nzVals();
-        //auto SpAddHybrid_ncols = SpAddHybrid_out.get_ncols();
-        //auto SpAddHybrid_nrows = SpAddHybrid_out.get_nrows();
-        //if(SpAddHash_ncols == SpAddHybrid_ncols){
-            //bool flag = true;
-            //for(int32_t i = 0; i < SpAddHash_colPtr->size(); i++){
-                //if((*SpAddHash_colPtr)[i] != (*SpAddHybrid_colPtr)[i]){
-                    //printf("colPtr[%d]\tHash: %d - Hybrid: %d\n", i, (*SpAddHash_colPtr)[i], (*SpAddHybrid_colPtr)[i]);
-                    //flag = false;
-                //}
-            //}
-            //for(int32_t j = 0; j < SpAddHash_rowIds->size(); j++){
-                //if((*SpAddHash_rowIds)[j] != (*SpAddHybrid_rowIds)[j]){
-                    //printf("rowIds[%d]\tHash: %d - Hybrid: %d\n", j, (*SpAddHash_rowIds)[j], (*SpAddHybrid_rowIds)[j]);
-                    //flag = false;
-                //}
-            //}
-            //for(int32_t j = 0; j < SpAddHash_nzVals->size(); j++){
-                //if((*SpAddHash_nzVals)[j] != (*SpAddHybrid_nzVals)[j]){
-                    //printf("nzVals[%d]\tHash: %d - Hybrid: %d\n", j, (*SpAddHash_nzVals)[j], (*SpAddHybrid_nzVals)[j]);
-                    //flag = false;
-                //}
-            //}
-            //if(flag == true){
-                //printf("Everything matched! \n");
-            //}
-        //}
-        //else{
-            //printf("Number of columns not equal!!!\nAborting further check.\n");
-        //}
+        ////std::cout << SpAddHybrid_out.get_nnz() << std::endl;
+        ////SpAddHybrid_out.print_all();
 
 
         //double t0, t1, t2, t3;
@@ -340,7 +429,7 @@ int main(int argc, char* argv[]){
         //printf("Time for symbolic with pure hash: %lf\n", t1-t0);
         
         //t0 = omp_get_wtime();
-        //pvector<int32_t> nnzCPerCol2 = symbolicSpMultiAddHashSliding2<int32_t, int32_t, int32_t, int32_t, int32_t>(vec);
+        //pvector<int32_t> nnzCPerCol2 = symbolicSpMultiAddHashSliding<int32_t, int32_t, int32_t, int32_t, int32_t>(vec, 1024, 1024);
         //t1 = omp_get_wtime();
         //printf("Time for symbolic with sliding hash: %lf\n", t1-t0);
         
@@ -360,7 +449,8 @@ int main(int argc, char* argv[]){
         //printf("Transposing MKL output: ");
         //sparse_matrix_t *mkl_out = (sparse_matrix_t *) malloc( sizeof(sparse_matrix_t) );
         //sparse_status_t conv_status = mkl_sparse_convert_csr(
-            //mkl_sums[k-1],
+            ////mkl_sums[k-1],
+            //mkl_csr_matrices[0],
             //SPARSE_OPERATION_TRANSPOSE, // Transpose because it will make CSR matrix to be effectively CSC
             //mkl_out
         //);
@@ -457,8 +547,8 @@ int main(int argc, char* argv[]){
        if(mkl_rows[i] != NULL) free(mkl_rows[i]); 
        if(mkl_pointerB[i] != NULL) free(mkl_pointerB[i]);
        if(mkl_pointerE[i] != NULL) free(mkl_pointerE[i]);
-       if(mkl_csc_matrices[i] != NULL) mkl_sparse_destroy(mkl_csc_matrices[i]);
-       if(mkl_csr_matrices[i] != NULL) mkl_sparse_destroy(mkl_csr_matrices[i]);
+       //if(mkl_csc_matrices[i] != NULL) mkl_sparse_destroy(mkl_csc_matrices[i]);
+       //if(mkl_csr_matrices[i] != NULL) mkl_sparse_destroy(mkl_csr_matrices[i]);
        //if(mkl_sums[i] != NULL) mkl_sparse_destroy(mkl_sums[i]);
     }
     if(mkl_values != NULL) free(mkl_values);
@@ -468,6 +558,55 @@ int main(int argc, char* argv[]){
     if(mkl_csc_matrices != NULL) free(mkl_csc_matrices);
     if(mkl_csr_matrices != NULL) free(mkl_csr_matrices);
     if(mkl_sums != NULL) free(mkl_sums);
+
+    //std::vector<int> threads{48};
+    //std::vector<int32_t> windowSizes{16, 32, 64, 128, 256, 512, 1024, 1024 * 2, 1024 * 4, 1024 * 8, 1024 * 16, 1024 * 32, 1024 * 64, 1024 * 128, 1024 * 256, 1024 * 512, 1024 * 1024};
+    ////std::vector<int32_t> windowSizes{1024 * 16};
+
+    //for(int t = 0; t < threads.size(); t++){
+        //omp_set_num_threads(threads[t]);
+        //mkl_set_num_threads(threads[t]);
+        //for (int w = 0; w < windowSizes.size(); w++){
+            ////if(type == 0){
+                ////std::cout << "ER" << "," ;
+            ////}
+            ////else{
+                ////std::cout << "RMAT" << "," ;
+            ////}
+            ////std::cout << x << "," ;
+            ////std::cout << y << "," ;
+            ////std::cout << k << "," ;
+            ////std::cout << threads[t] << ",";
+            ////std::cout << "SpMultiAddHash" << ","; 
+            ////std::cout << windowSizes[w] << ",";
+            ////clock.Start(); 
+            ////pvector<int32_t> nnzCPerCol = symbolicSpMultiAddHash<int32_t, int32_t, int32_t, int32_t, int32_t>(vec);
+            ////SpMultiAddHash<int32_t,int32_t, int32_t,int32_t> (vec, nnzCPerCol, windowSizes[w], true);
+            ////clock.Stop();
+            ////std::cout << clock.Seconds() << std::endl;
+            //////SpAddHash_out.print_all();
+        
+            //if(type == 0){
+                //std::cout << "ER" << "," ;
+            //}
+            //else{
+                //std::cout << "RMAT" << "," ;
+            //}
+            //std::cout << x << "," ;
+            //std::cout << y << "," ;
+            //std::cout << k << "," ;
+            //std::cout << threads[t] << ",";
+            //std::cout << "SpMultiAddHashSliding" << ","; 
+            //std::cout << windowSizes[w] << ",";
+            //clock.Start(); 
+            //SpMultiAddHashSliding<int32_t,int32_t, int32_t,int32_t> (vec, windowSizes[w], windowSizes[w], false);
+            //clock.Stop();
+            //std::cout << clock.Seconds() << std::endl;
+            ////std::cout << SpAddHybrid_out.get_nnz() << std::endl;
+            ////SpAddHybrid_out.print_all();
+            
+        //}
+    //}
 
 	return 0;
 
