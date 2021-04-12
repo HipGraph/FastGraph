@@ -27,22 +27,63 @@ int main(int argc, char* argv[]){
         //printf("Using %d RMAT matrices of scale %d, avg degree %d\n", k, x, y);
     //}
 
-	std::vector< CSC<int32_t, int32_t, int32_t>* > vec;
-    std::vector< CSC<int32_t, int32_t, int32_t>* > vec_temp;
+	std::vector< CSC<uint32_t, uint32_t, uint32_t>* > vec;
+    std::vector< CSC<uint32_t, uint32_t, uint32_t>* > vec_temp;
 
     // below is method to use random matrices from COO.h
     for(int i = 0; i < k; i++){
-        COO<int32_t, int32_t, int32_t> coo;
+        //omp_set_num_threads(1);
+        COO<uint32_t, uint32_t, uint32_t> coo;
         if(type == 0){
-            coo.GenER(x,y,weighted, i);   //(x,y,true) Generate a weighted ER matrix with 2^x rows and columns and y nonzeros per column
+            coo.GenER(x,y,weighted, i*999);   //(x,y,true) Generate a weighted ER matrix with 2^x rows and columns and y nonzeros per column
         }
         else{
-            coo.GenRMAT(x,y,weighted, i);   //(x,y,true) Generate a weighted RMAT matrix with 2^x rows and columns and y nonzeros per column
+            coo.GenRMAT(x,y,weighted, i*999);   //(x,y,true) Generate a weighted RMAT matrix with 2^x rows and columns and y nonzeros per column
         }
-        vec.push_back(new CSC<int32_t, int32_t, int32_t>(coo));
-        //vec_temp.push_back(new CSC<int32_t, int32_t, int32_t>(coo));
+        //omp_set_num_threads(48);
+
+        vec.push_back(new CSC<uint32_t, uint32_t, uint32_t>(coo));
+        vec_temp.push_back(new CSC<uint32_t, uint32_t, uint32_t>(coo));
         //vec[i]->print_all();
     }
+
+    //COO<uint32_t, uint32_t, uint32_t> coo;
+    //if(type == 0) coo.GenER(x,y,weighted, 20210409);   //(x,y,true) Generate a weighted ER matrix with 2^x rows and columns and y nonzeros per column
+    //else coo.GenRMAT(x,y,weighted, 20210409);
+    //for(int i = 0; i < k; i++){
+        //coo.RandReLabel(false);
+        //vec.push_back(new CSC<uint32_t, uint32_t, uint32_t>(coo));
+        ////vec_temp.push_back(new CSC<uint32_t, uint32_t, uint32_t>(coo));
+    //}
+
+    for (int j = 0; j < k; j++){
+        printf("Matrix %d:", j);
+        const pvector<uint32_t> *col_ptr_j = vec[j]->get_colPtr();
+        const pvector<uint32_t> *row_ids_j = vec[j]->get_rowIds();
+        const pvector<uint32_t> *nz_j = vec[j]->get_nzVals();
+
+        pvector<uint32_t> nnzCol;
+        uint32_t maxNnz = 0;
+        uint32_t maxNnzI = 0;
+        for (uint32_t i = 0; i < col_ptr_j->size()-1; i++){
+            nnzCol.push_back((*col_ptr_j)[i+1] - (*col_ptr_j)[i]);
+            if (nnzCol[i] > maxNnz){
+                maxNnz = nnzCol[i];
+                maxNnzI = i;
+            }
+        }
+
+        printf("maxNnz: %d maxNnzI: %d", maxNnz, maxNnzI);
+        //getStats<uint32_t>(nnzCol, true);
+        printf("\n");
+    }
+
+    //for (int ji = 0; ji < k; ji++){
+        //for (int jj = 0; jj < k; jj++){
+            //std::cout << (*(vec[ji]) == *(vec[jj])) << " " ;
+        //}
+        //std::cout << std::endl;
+    //}
     
     Timer clock;
 
@@ -142,8 +183,8 @@ int main(int argc, char* argv[]){
 
     //std::vector<int> threads{1, 6, 12, 24, 48};
     //std::vector<int> threads{1, 16, 48};
-    std::vector<int> threads{48, 1, 12};
-    //std::vector<int> threads{12};
+    //std::vector<int> threads{48, 1, 12};
+    std::vector<int> threads{48};
 
     int iterations = 1;
 
@@ -269,18 +310,22 @@ int main(int argc, char* argv[]){
         //std::cout << "MKL" << ","; 
         //std::cout << mkl_time << std::endl;
         
-        CSC<int32_t, int32_t, int32_t> SpAddHash_out;
 
-        //CSC<int32_t, int32_t, int32_t> OutPairwiseLinear;
+        //CSC<uint32_t, uint32_t, uint32_t> OutPairwiseLinear;
+        //double lin_time = 0;
         //clock.Start();
-        //std::vector<size_t> intermediate_nnz;
-        //OutPairwiseLinear = SpAdd<int32_t,int32_t, int32_t,int32_t> (vec[0], vec[1]);
-        ////intermediate_nnz.push_back(OutPairwiseLinear.get_nnz());
-        //for (int j = 2; j < k; j++){
-            //OutPairwiseLinear = SpAdd<int32_t,int32_t,int32_t,int32_t>(&OutPairwiseLinear, vec[j]);
-            ////intermediate_nnz.push_back(OutPairwiseLinear.get_nnz());
-        //}
+        //OutPairwiseLinear = SpAdd<uint32_t,uint32_t, uint32_t,uint32_t> (vec[0], vec[1]);
         //clock.Stop();
+        //lin_time += clock.Seconds();
+        //std::cout << vec[0]->get_nnz() << " + " << vec[1]->get_nnz() << " = " << OutPairwiseLinear.get_nnz() << " Time: " << clock.Seconds() << std::endl;
+        //for (int j = 2; j < k; j++){
+            //std::cout << vec[j]->get_nnz() << " + " << OutPairwiseLinear.get_nnz() << " = ";
+            //clock.Start();
+            //OutPairwiseLinear = SpAdd<uint32_t,uint32_t,uint32_t,uint32_t>(&OutPairwiseLinear, vec[j]);
+            //clock.Stop();
+            //lin_time += clock.Seconds();
+            //std::cout << OutPairwiseLinear.get_nnz() << " Time: " << clock.Seconds() << std::endl;
+        //}
         //if(type == 0){
             //std::cout << "ER" << "," ;
         //}
@@ -292,57 +337,67 @@ int main(int argc, char* argv[]){
         //std::cout << k << "," ;
         //std::cout << threads[i] << ",";
         //std::cout << "SpAddPairwiseLinear" << ","; 
-        //std::cout << clock.Seconds() << std::endl;
+        //std::cout << lin_time << std::endl;
 
-        //std::vector< CSC<int32_t, int32_t, int32_t>* > tree(vec.begin(), vec.end());
-        ////std::vector< CSC<int32_t, int32_t, int32_t>* > tree(vec_temp.begin(), vec_temp.end());
-        //CSC<int32_t, int32_t, int32_t> * temp1;
-        //CSC<int32_t, int32_t, int32_t> * temp2;
-        //int nIntermediate = tree.size();
-        //double pairwise_time = 0;
-        //while(nIntermediate > 1){
-            //int j = 0;
-            //int idxf = j * 2 + 0;
-            //int idxs = idxf;
-            //if(idxs + 1 < nIntermediate) idxs++;
-            //while(idxs < nIntermediate){
-                //if(idxf < idxs){
-                    //temp1 = tree[idxf];
-                    //temp2 = tree[idxs];
-                    //clock.Start();
-                    //pvector<int32_t> nnzCPerCol = symbolicSpAddRegular<int32_t,int32_t,int32_t,int32_t>(tree[idxf], tree[idxs]);
-                    //tree[j] = new CSC<int32_t, int32_t, int32_t>(SpAddRegular<int32_t,int32_t,int32_t,int32_t>(tree[idxf], tree[idxs], nnzCPerCol));
-                    //clock.Stop();
-                    //pairwise_time += clock.Seconds();
-                    //delete temp1;
-                    //delete temp2;
-                //}
-                //else{
-                    //tree[j] = tree[idxf];
-                //}
-                //j++;
-                //idxf = j * 2 + 0;
-                //idxs = idxf;
-                //if(idxs + 1 < nIntermediate) idxs++;
-            //}
-            //nIntermediate = j;
-        //}
-        //if(type == 0){
-            //std::cout << "ER" << "," ;
-        //}
-        //else{
-            //std::cout << "RMAT" << "," ;
-        //}
-        //std::cout << x << "," ;
-        //std::cout << y << "," ;
-        //std::cout << k << "," ;
-        //std::cout << threads[i] << ",";
-        //std::cout << "SpAddPairwiseTree" << ","; 
-        //std::cout << pairwise_time << std::endl;
+        //std::vector< CSC<uint32_t, uint32_t, uint32_t>* > tree(vec.begin(), vec.end());
+        std::vector< CSC<uint32_t, uint32_t, uint32_t>* > tree(vec_temp.begin(), vec_temp.end());
+        CSC<uint32_t, uint32_t, uint32_t> * temp1;
+        CSC<uint32_t, uint32_t, uint32_t> * temp2;
+        int nIntermediate = tree.size();
+        int level = 0;
+        double tree_time = 0;
+        while(nIntermediate > 1){
+            int j = 0;
+            int idxf = j * 2 + 0;
+            int idxs = idxf;
+            if(idxs + 1 < nIntermediate) idxs++;
+            while(idxs < nIntermediate){
+                if(idxf < idxs){
+                    temp1 = tree[idxf];
+                    temp2 = tree[idxs];
+                    clock.Start();
+                    pvector<uint32_t> nnzCPerCol = symbolicSpAddRegular<uint32_t,uint32_t,uint32_t,uint32_t>(tree[idxf], tree[idxs]);
+                    tree[j] = new CSC<uint32_t, uint32_t, uint32_t>(SpAddRegular<uint32_t,uint32_t,uint32_t,uint32_t>(tree[idxf], tree[idxs], nnzCPerCol));
+                    clock.Stop();
+                    tree_time += clock.Seconds();
+                    std::cout << "level " << level << ": ";
+                    std::cout << temp1->get_nnz() << " + " << temp2->get_nnz() << " = " << tree[j]->get_nnz() << " Time: " << clock.Seconds() << std::endl;
+                    delete temp1;
+                    delete temp2;
+                }
+                else{
+                    tree[j] = tree[idxf];
+                    std::cout << "level " << level << ": ";
+                    std::cout << tree[idxf]->get_nnz() << " + " << 0 << " = " << tree[j]->get_nnz() << std::endl;
+                }
+                j++;
+                idxf = j * 2 + 0;
+                idxs = idxf;
+                if(idxs + 1 < nIntermediate) idxs++;
+            }
+            nIntermediate = j;
+            level++;
+        }
+        if(type == 0){
+            std::cout << "ER" << "," ;
+        }
+        else{
+            std::cout << "RMAT" << "," ;
+        }
+        std::cout << x << "," ;
+        std::cout << y << "," ;
+        std::cout << k << "," ;
+        std::cout << threads[i] << ",";
+        std::cout << "SpAddPairwiseTree" << ","; 
+        std::cout << tree_time << std::endl;
+
+
+        CSC<uint32_t, uint32_t, uint32_t> SpAddHash_out;
+        pvector<uint32_t> nnzCPerCol;
         
         //clock.Start(); 
-        //pvector<int32_t> nnzCPerCol = symbolicSpMultiAddHash<int32_t, int32_t, int32_t, int32_t, int32_t>(vec);
-        //SpAddHash_out = SpMultiAddHash<int32_t,int32_t, int32_t,int32_t> (vec, nnzCPerCol, true);
+        //nnzCPerCol = symbolicSpMultiAddHash<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>(vec);
+        //SpAddHash_out = SpMultiAddHash<uint32_t,uint32_t, uint32_t,uint32_t> (vec, nnzCPerCol, true);
         //clock.Stop();
         //if(type == 0){
             //std::cout << "ER" << "," ;
@@ -354,39 +409,33 @@ int main(int argc, char* argv[]){
         //std::cout << y << "," ;
         //std::cout << k << "," ;
         //std::cout << threads[i] << ",";
-        //std::cout << "SpMultiAddHash" << ","; 
+        //std::cout << "SpMultiAddHash (sorted)" << ","; 
         //std::cout << clock.Seconds() << std::endl;
-        ////SpAddHash_out.print_all();
-        
-        //double sliding_time = 0;
-        //for(int it = 0; it < iterations; it++){
-            //clock.Start(); 
-            //CSC<int32_t, int32_t, int32_t> SpAddHybrid_out = SpMultiAddHashSliding<int32_t,int32_t, int32_t,int32_t> (vec, 512, 512, false);
-            //clock.Stop();
-            //sliding_time += clock.Seconds();
-            //if(type == 0){
-                //std::cout << "ER" << "," ;
-            //}
-            //else{
-                //std::cout << "RMAT" << "," ;
-            //}
-            //std::cout << x << "," ;
-            //std::cout << y << "," ;
-            //std::cout << k << "," ;
-            //std::cout << threads[i] << ",";
-            //std::cout << "SpMultiAddHashSliding" << ","; 
-            //std::cout << clock.Seconds() << std::endl;
-            ////std::cout << SpAddHybrid_out.get_nnz() << std::endl;
-            ////SpAddHybrid_out.print_all();
-        //}
 
-        double spa_time = 0;
-        CSC<int32_t, int32_t, int32_t> SpAddSpA_out;
+        //clock.Start(); 
+        //nnzCPerCol = symbolicSpMultiAddHash<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>(vec);
+        //SpAddHash_out = SpMultiAddHash<uint32_t,uint32_t, uint32_t,uint32_t> (vec, nnzCPerCol, false);
+        //clock.Stop();
+        //if(type == 0){
+            //std::cout << "ER" << "," ;
+        //}
+        //else{
+            //std::cout << "RMAT" << "," ;
+        //}
+        //std::cout << x << "," ;
+        //std::cout << y << "," ;
+        //std::cout << k << "," ;
+        //std::cout << threads[i] << ",";
+        //std::cout << "SpMultiAddHash (unsorted)" << ","; 
+        //std::cout << clock.Seconds() << std::endl;
+        
+        double sliding_time = 0;
         for(int it = 0; it < iterations; it++){
             clock.Start(); 
-            SpAddSpA_out = SpMultiAddSpA<int32_t,int32_t, int32_t,int32_t> (vec);
+            //CSC<uint32_t, uint32_t, uint32_t> SpAddHybrid_out = SpMultiAddHashSliding<uint32_t,uint32_t, uint32_t,uint32_t> (vec, 512, 512, true);
+            SpAddHash_out = SpMultiAddHashSliding<uint32_t,uint32_t, uint32_t,uint32_t> (vec, 512, 512, true);
             clock.Stop();
-            spa_time += clock.Seconds();
+            sliding_time += clock.Seconds();
             if(type == 0){
                 std::cout << "ER" << "," ;
             }
@@ -397,14 +446,40 @@ int main(int argc, char* argv[]){
             std::cout << y << "," ;
             std::cout << k << "," ;
             std::cout << threads[i] << ",";
-            std::cout << "SpMultiAddSpA" << ","; 
+            std::cout << "SpMultiAddHashSliding (sorted)" << ","; 
             std::cout << clock.Seconds() << std::endl;
             //std::cout << SpAddHybrid_out.get_nnz() << std::endl;
             //SpAddHybrid_out.print_all();
         }
+
+        if(*(tree[0]) == SpAddHash_out) printf("Equal\n");
+        else printf("Not equal\n");
+
+        //double spa_time = 0;
+        //CSC<uint32_t, uint32_t, uint32_t> SpAddSpA_out;
+        //for(int it = 0; it < iterations; it++){
+            //clock.Start(); 
+            //SpAddSpA_out = SpMultiAddSpA<uint32_t,uint32_t, uint32_t,uint32_t> (vec);
+            //clock.Stop();
+            //spa_time += clock.Seconds();
+            //if(type == 0){
+                //std::cout << "ER" << "," ;
+            //}
+            //else{
+                //std::cout << "RMAT" << "," ;
+            //}
+            //std::cout << x << "," ;
+            //std::cout << y << "," ;
+            //std::cout << k << "," ;
+            //std::cout << threads[i] << ",";
+            //std::cout << "SpMultiAddSpA" << ","; 
+            //std::cout << clock.Seconds() << std::endl;
+            ////std::cout << SpAddHybrid_out.get_nnz() << std::endl;
+            ////SpAddHybrid_out.print_all();
+        //}
         
         //clock.Start(); 
-        //CSC<int32_t, int32_t, int32_t> SpAddHeap_out = SpMultiAddHeap<int32_t,int32_t, int32_t,int32_t, int32_t> (vec);
+        //CSC<uint32_t, uint32_t, uint32_t> SpAddHeap_out = SpMultiAddHeap<uint32_t,uint32_t, uint32_t,uint32_t, uint32_t> (vec);
         //clock.Stop();
         //if(type == 0){
             //std::cout << "ER" << "," ;
@@ -424,17 +499,17 @@ int main(int argc, char* argv[]){
 
         //double t0, t1, t2, t3;
         //t0 = omp_get_wtime();
-        //pvector<int32_t> nnzCPerCol = symbolicSpMultiAddHash<int32_t, int32_t, int32_t, int32_t, int32_t>(vec);
+        //pvector<uint32_t> nnzCPerCol = symbolicSpMultiAddHash<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>(vec);
         //t1 = omp_get_wtime();
         //printf("Time for symbolic with pure hash: %lf\n", t1-t0);
         
         //t0 = omp_get_wtime();
-        //pvector<int32_t> nnzCPerCol2 = symbolicSpMultiAddHashSliding<int32_t, int32_t, int32_t, int32_t, int32_t>(vec, 1024, 1024);
+        //pvector<uint32_t> nnzCPerCol2 = symbolicSpMultiAddHashSliding<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>(vec, 1024, 1024);
         //t1 = omp_get_wtime();
         //printf("Time for symbolic with sliding hash: %lf\n", t1-t0);
         
         //bool flag = true;
-        //for(int32_t i=0; i< nnzCPerCol.size(); i++)
+        //for(uint32_t i=0; i< nnzCPerCol.size(); i++)
         //{
             //if(nnzCPerCol[i] != nnzCPerCol2[i]){
                 //flag = false;
@@ -560,8 +635,8 @@ int main(int argc, char* argv[]){
     if(mkl_sums != NULL) free(mkl_sums);
 
     //std::vector<int> threads{48};
-    //std::vector<int32_t> windowSizes{16, 32, 64, 128, 256, 512, 1024, 1024 * 2, 1024 * 4, 1024 * 8, 1024 * 16, 1024 * 32, 1024 * 64, 1024 * 128, 1024 * 256, 1024 * 512, 1024 * 1024};
-    ////std::vector<int32_t> windowSizes{1024 * 16};
+    //std::vector<uint32_t> windowSizes{16, 32, 64, 128, 256, 512, 1024, 1024 * 2, 1024 * 4, 1024 * 8, 1024 * 16, 1024 * 32, 1024 * 64, 1024 * 128, 1024 * 256, 1024 * 512, 1024 * 1024};
+    ////std::vector<uint32_t> windowSizes{1024 * 16};
 
     //for(int t = 0; t < threads.size(); t++){
         //omp_set_num_threads(threads[t]);
@@ -580,8 +655,8 @@ int main(int argc, char* argv[]){
             ////std::cout << "SpMultiAddHash" << ","; 
             ////std::cout << windowSizes[w] << ",";
             ////clock.Start(); 
-            ////pvector<int32_t> nnzCPerCol = symbolicSpMultiAddHash<int32_t, int32_t, int32_t, int32_t, int32_t>(vec);
-            ////SpMultiAddHash<int32_t,int32_t, int32_t,int32_t> (vec, nnzCPerCol, windowSizes[w], true);
+            ////pvector<uint32_t> nnzCPerCol = symbolicSpMultiAddHash<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>(vec);
+            ////SpMultiAddHash<uint32_t,uint32_t, uint32_t,uint32_t> (vec, nnzCPerCol, windowSizes[w], true);
             ////clock.Stop();
             ////std::cout << clock.Seconds() << std::endl;
             //////SpAddHash_out.print_all();
@@ -599,7 +674,7 @@ int main(int argc, char* argv[]){
             //std::cout << "SpMultiAddHashSliding" << ","; 
             //std::cout << windowSizes[w] << ",";
             //clock.Start(); 
-            //SpMultiAddHashSliding<int32_t,int32_t, int32_t,int32_t> (vec, windowSizes[w], windowSizes[w], false);
+            //SpMultiAddHashSliding<uint32_t,uint32_t, uint32_t,uint32_t> (vec, windowSizes[w], windowSizes[w], false);
             //clock.Stop();
             //std::cout << clock.Seconds() << std::endl;
             ////std::cout << SpAddHybrid_out.get_nnz() << std::endl;
