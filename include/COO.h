@@ -222,7 +222,7 @@ void COO<RIT, CIT, VT>::GenER(int scale, int d, bool isWeighted, int64_t kRandSe
         }
     }
     t.Stop();
-    PrintTime("ER Generation Time", t.Seconds());
+    //PrintTime("ER Generation Time", t.Seconds());
 }
 
 
@@ -294,7 +294,7 @@ void COO<RIT, CIT, VT>::GenRMAT(int scale, int d, bool isWeighted, int64_t kRand
         int tid = omp_get_thread_num();
         if(tid == 0){
             nthreads = omp_get_num_threads();
-            block_size = nnz_ / nthreads;
+            block_size = nnz_ / nthreads; // Each block is processed by a thread
         }
     }
 
@@ -341,11 +341,13 @@ void COO<RIT, CIT, VT>::GenRMAT(int scale, int d, bool isWeighted, int64_t kRand
         nzVals_.resize(nnz_);
 #pragma omp parallel
         {
+            int tid = omp_get_thread_num();
             std::mt19937 rng;
+            rng.seed(randSeeds[tid]);
             std::uniform_int_distribution<int> udist(1, 255);
 #pragma omp for
             for (size_t block=0; block < nnz_; block+=block_size) {
-                rng.seed(kRandSeed + block/block_size);
+                //rng.seed(kRandSeed + block/block_size);
                 for (size_t i=block; i < std::min(block+block_size, nnz_); i++)
                 {
                     nzVals_[i] = static_cast<VT>(udist(rng)%255);
@@ -355,7 +357,7 @@ void COO<RIT, CIT, VT>::GenRMAT(int scale, int d, bool isWeighted, int64_t kRand
     }
 
     t.Stop();
-    PrintTime("RMAT Generation Time", t.Seconds());
+    //PrintTime("RMAT Generation Time", t.Seconds());
 }
 
 

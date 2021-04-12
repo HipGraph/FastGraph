@@ -5,6 +5,7 @@
 #include "GAP/pvector.h"
 #include "GAP/timer.h"
 #include "utils.h"
+#include "radixSort.h"
 
 #include <vector> // needed while taking input
 #include <unordered_map>
@@ -583,6 +584,7 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pv
                         // try radix sort
                         //std::sort(globalHashVec.begin(), globalHashVec.begin() + index, sort_less<IT, NT>);
                         std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
+                        //integerSort<RIT>(globalHashVec.data(), index);
                     
                     
                         for (size_t j=0; j < index; ++j)
@@ -652,7 +654,7 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pv
  * Sliding hash
  * */
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
-CSC<RIT, VT, CPT> SpMultiAddHashSliding(std::vector<CSC<RIT, VT, CPT>* > & matrices, const RIT windowSizeSymbolic, const RIT windowSize, bool sort=true)
+CSC<RIT, VT, CPT> SpMultiAddHashSliding(std::vector<CSC<RIT, VT, CPT>* > & matrices, const RIT windowSizeSymbolic, const RIT windowSize, bool sorted=true)
 {
     double t0, t1, t2, t3, t4, t5;
 
@@ -1057,19 +1059,33 @@ CSC<RIT, VT, CPT> SpMultiAddHashSliding(std::vector<CSC<RIT, VT, CPT>* > & matri
                             } 
                         }
 
-                        size_t index = 0;
-                        for (size_t j=0; j < htSize; ++j){
-                            if (globalHashVec[j].first != -1){
-                                globalHashVec[index++] = globalHashVec[j];
+                        if(sorted){
+                            size_t index = 0;
+                            for (size_t j=0; j < htSize; ++j){
+                                if (globalHashVec[j].first != -1){
+                                    globalHashVec[index++] = globalHashVec[j];
+                                }
+                            }
+                    
+                            //std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
+                            integerSort<RIT>(globalHashVec.data(), index);
+                        
+                            for (size_t j=0; j < index; ++j){
+                                CrowIds[prefixSum[i]] = globalHashVec[j].first;
+                                CnzVals[prefixSum[i]] = globalHashVec[j].second;
+                                prefixSum[i] ++;
                             }
                         }
-                
-                        std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
-                    
-                        for (size_t j=0; j < index; ++j){
-                            CrowIds[prefixSum[i]] = globalHashVec[j].first;
-                            CnzVals[prefixSum[i]] = globalHashVec[j].second;
-                            prefixSum[i] ++;
+                        else{
+                            for (size_t j=0; j < htSize; ++j)
+                            {
+                                if (globalHashVec[j].first != -1)
+                                {
+                                    CrowIds[prefixSum[i]] = globalHashVec[j].first;
+                                    CnzVals[prefixSum[i]] = globalHashVec[j].second;
+                                    prefixSum[i] ++;
+                                }
+                            }
                         }
                     }
                     
@@ -1120,19 +1136,33 @@ CSC<RIT, VT, CPT> SpMultiAddHashSliding(std::vector<CSC<RIT, VT, CPT>* > & matri
                             }
                         } 
                     }
-                    size_t index = 0;
-                    for (size_t j=0; j < htSize; ++j){
-                        if (globalHashVec[j].first != -1){
-                            globalHashVec[index++] = globalHashVec[j];
+                    if(sorted){
+                        size_t index = 0;
+                        for (size_t j=0; j < htSize; ++j){
+                            if (globalHashVec[j].first != -1){
+                                globalHashVec[index++] = globalHashVec[j];
+                            }
+                        }
+                
+                        //std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
+                        integerSort<RIT>(globalHashVec.data(), index);
+                    
+                        for (size_t j=0; j < index; ++j){
+                            CrowIds[prefixSum[i]] = globalHashVec[j].first;
+                            CnzVals[prefixSum[i]] = globalHashVec[j].second;
+                            prefixSum[i] ++;
                         }
                     }
-            
-                    std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
-                
-                    for (size_t j=0; j < index; ++j){
-                        CrowIds[prefixSum[i]] = globalHashVec[j].first;
-                        CnzVals[prefixSum[i]] = globalHashVec[j].second;
-                        prefixSum[i] ++;
+                    else{
+                        for (size_t j=0; j < htSize; ++j)
+                        {
+                            if (globalHashVec[j].first != -1)
+                            {
+                                CrowIds[prefixSum[i]] = globalHashVec[j].first;
+                                CnzVals[prefixSum[i]] = globalHashVec[j].second;
+                                prefixSum[i] ++;
+                            }
+                        }
                     }
                 }
                 //colTimes[i] = omp_get_wtime() - tc;
