@@ -178,24 +178,41 @@ void COO<RIT, CIT, VT>::GenER(int scale, int d, bool isWeighted, int64_t kRandSe
     //TODO: think about a block size based on the number of threads
     // blocking is done for random number generators
     // one seed per block
-    static const size_t block_size = 1<<16;
+    //static const size_t block_size = 1<<16;
     
     Timer t;
     t.Start();
     nzRows_.resize(nnz_);
     nzCols_.resize(nnz_);
-    
+
+    size_t nthreads;
+    size_t block_size;
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
+            block_size = nnz_ / nthreads;
+        }
+    }
+
+    std::mt19937 rng;
+    rng.seed(kRandSeed);
+    std::vector<size_t> randSeeds(nthreads);
+    for (int t = 0; t < nthreads; t++) randSeeds[t] = rng();
     
     if(isWeighted_) nzVals_.resize(nnz_);
 #pragma omp parallel
     {
         std::mt19937 rng;
         std::uniform_int_distribution<RIT> udist(0, nrows_-1);
+        
+        int tid = omp_get_thread_num();
+        rng.seed(randSeeds[tid]);
 
 #pragma omp for
         for (size_t block=0; block < nnz_; block+=block_size)
         {
-            rng.seed(kRandSeed + block/block_size);
             for (size_t i=block; i < std::min(block+block_size, nnz_); i++)
             {
                 nzRows_[i] = udist(rng);
@@ -205,7 +222,7 @@ void COO<RIT, CIT, VT>::GenER(int scale, int d, bool isWeighted, int64_t kRandSe
         }
     }
     t.Stop();
-    //PrintTime("ER Generation Time", t.Seconds());
+    PrintTime("ER Generation Time", t.Seconds());
 }
 
 
@@ -262,8 +279,6 @@ void COO<RIT, CIT, VT>::GenRMAT(int scale, int d, bool isWeighted, int64_t kRand
     nrows_ = 1l << scale;
     ncols_ = nrows_;
     nnz_ = nrows_  * d;
-
-    static const size_t block_size = 1<<16;
     
     Timer t;
     t.Start();
@@ -272,14 +287,32 @@ void COO<RIT, CIT, VT>::GenRMAT(int scale, int d, bool isWeighted, int64_t kRand
     nzCols_.resize(nnz_);
     const float A = 0.57f, B = 0.19f, C = 0.19f;
 
+    size_t nthreads;
+    size_t block_size;
 #pragma omp parallel
     {
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
+            block_size = nnz_ / nthreads;
+        }
+    }
+
+    std::mt19937 rng;
+    rng.seed(kRandSeed);
+    std::vector<size_t> randSeeds(nthreads);
+    for (int t = 0; t < nthreads; t++) randSeeds[t] = rng();
+
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
         std::mt19937 rng;
+        rng.seed(randSeeds[tid]);
         std::uniform_real_distribution<float> udist(0, 1.0f);
 #pragma omp for
         for (size_t block=0; block < nnz_; block+=block_size)
         {
-            rng.seed(kRandSeed + block/block_size);
+            //rng.seed(kRandSeed + block/block_size);
             for (size_t i=block; i < std::min(block+block_size, nnz_); i++)
             {
                 RIT row = 0, col = 0;
@@ -322,7 +355,7 @@ void COO<RIT, CIT, VT>::GenRMAT(int scale, int d, bool isWeighted, int64_t kRand
     }
 
     t.Stop();
-    //PrintTime("RMAT Generation Time", t.Seconds());
+    PrintTime("RMAT Generation Time", t.Seconds());
 }
 
 
