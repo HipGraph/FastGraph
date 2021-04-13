@@ -63,7 +63,7 @@ public:
     
     void GenER(int scale, int d, bool isWeighted, int64_t kRandSeed = 5102020);
     void GenRMAT(int scale, int d, bool isWeighted, int64_t kRandSeed = 5102020);
-    void RandReLabel(bool symmPerm=true);
+    void RandReLabel(int64_t randSeed, bool symmPerm=true);
     pvector<CIT>  NnzPerRow();
     pvector<RIT>  NnzPerCol();
     void PrintInfo();
@@ -233,31 +233,37 @@ void COO<RIT, CIT, VT>::GenER(int scale, int d, bool isWeighted, int64_t kRandSe
 // TODO: Access to permute array can be out of cache (consider blocking)
 
 template <typename RIT, typename CIT, typename VT>
-void COO<RIT, CIT, VT>:: RandReLabel(bool symmPerm)
+void COO<RIT, CIT, VT>:: RandReLabel(int64_t randSeed, bool symmPerm)
 {
     sortType_ = UNSORTED; // not sorted anymore after relabeling
     pvector<RIT> rowPerm(nrows_);
-    std::mt19937 rng(ROW_PERM_SEED);
+
+    std::mt19937 rng(randSeed);
+    size_t rowPermRandSeed = rng();
+    size_t colPermRandSeed = rng();
+
+    std::mt19937 rrng(rowPermRandSeed);
 #pragma omp parallel for
     for (RIT i=0; i < nrows_; i++)
         rowPerm[i] = i;
-    shuffle(rowPerm.begin(), rowPerm.end(), rng);
+    shuffle(rowPerm.begin(), rowPerm.end(), rrng);
     
     // symmetric purmutation
     if((nrows_ == ncols_) &&  symmPerm)
     {
-
 #pragma omp parallel for
         for (size_t i=0; i < nnz_; i++)
         {
-            nzRows_[i] = nzRows_[rowPerm[nzRows_[i]]];
-            nzCols_[i] = nzCols_[rowPerm[nzCols_[i]]];
+            //nzRows_[i] = nzRows_[rowPerm[nzRows_[i]]];
+            //nzCols_[i] = nzCols_[rowPerm[nzCols_[i]]];
+            nzRows_[i] = rowPerm[nzRows_[i]];
+            nzCols_[i] = rowPerm[nzCols_[i]];
         }
     }
     else // unsymmetric purmutation (only for bipartite matrices (square and nonsquare))
     {
         pvector<RIT> colPerm(ncols_);
-        std::mt19937 crng(COL_PERM_SEED);
+        std::mt19937 crng(colPermRandSeed);
 #pragma omp parallel for
         for (CIT i=0; i < ncols_; i++)
             colPerm[i] = i;
@@ -265,8 +271,10 @@ void COO<RIT, CIT, VT>:: RandReLabel(bool symmPerm)
 #pragma omp parallel for
         for (size_t i=0; i < nnz_; i++)
         {
-            nzRows_[i] = nzRows_[rowPerm[nzRows_[i]]];
-            nzCols_[i] = nzCols_[colPerm[nzCols_[i]]];
+            //nzRows_[i] = nzRows_[rowPerm[nzRows_[i]]];
+            //nzCols_[i] = nzCols_[colPerm[nzCols_[i]]];
+            nzRows_[i] = rowPerm[nzRows_[i]];
+            nzCols_[i] = colPerm[nzCols_[i]];
         }
     }
     
@@ -334,7 +342,7 @@ void COO<RIT, CIT, VT>::GenRMAT(int scale, int d, bool isWeighted, int64_t kRand
             }
         }
     }
-    RandReLabel();
+    RandReLabel(rng());
 
     if(isWeighted_)
     {
