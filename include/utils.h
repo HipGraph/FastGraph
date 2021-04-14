@@ -23,7 +23,7 @@ public std::binary_function< T, T, bool >
         if(a == b)      // covers the "division by zero" case as well: max(a,b) can't be zero if it fails
             return true;    // covered the integral numbers case
         
-        return ( std::abs((int64_t)a - (int64_t)b) < epsilon || (std::abs((int64_t)a - (int64_t)b) / std::max(std::abs((int64_t)a), std::abs((int64_t)b))) < epsilon ) ;
+        return ( std::abs((double)a - (double)b) < epsilon || (std::abs((double)a - (double)b) / std::max(std::abs((double)a), std::abs((double)b))) < epsilon ) ;
     }
     T epsilon;
 };

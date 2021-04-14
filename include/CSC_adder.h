@@ -583,9 +583,17 @@ CSC<RIT, VT, CPT> SpMultiAddHash(std::vector<CSC<RIT, VT, CPT>* > & matrices, pv
                     
                         // try radix sort
                         //std::sort(globalHashVec.begin(), globalHashVec.begin() + index, sort_less<IT, NT>);
-                        std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
-                        //integerSort<RIT>(globalHashVec.data(), index);
-                    
+                        //std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
+                        integerSort<VT>(globalHashVec.data(), index);
+                        
+                        //std::vector< std::pair<RIT,VT>> temp1(globalHashVec.begin(), globalHashVec.end());
+                        //std::vector< std::pair<RIT,VT>> temp2(globalHashVec.begin(), globalHashVec.end());
+                        //std::sort(temp1.begin(), temp1.begin() + index);
+                        //integerSort<VT>(temp2.data(), index);
+
+                        //for (size_t j = 0; j < index; j++){
+                            //if(temp1[j].first != temp2[j].first) printf("Column %d [nnz %d]: j=%d, %d vs %d\n", i, nnzPerCol[i], j, temp1[j].first, temp2[j].first);
+                        //}
                     
                         for (size_t j=0; j < index; ++j)
                         {
@@ -908,7 +916,7 @@ CSC<RIT, VT, CPT> SpMultiAddHashSliding(std::vector<CSC<RIT, VT, CPT>* > & matri
         ttimes[tid] = ttime;
     }
     t1 = omp_get_wtime();
-    //printf("%lf,", t1-t0);
+    printf("%lf,", t1-t0);
 #ifdef DEBUG
     printf("[Sliding Hash]\tTime for symbolic: %lf\n", t1-t0);
     printf("[Sliding Hash]\tStats of time consumed by threads:\n");
@@ -1068,7 +1076,7 @@ CSC<RIT, VT, CPT> SpMultiAddHashSliding(std::vector<CSC<RIT, VT, CPT>* > & matri
                             }
                     
                             //std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
-                            integerSort<RIT>(globalHashVec.data(), index);
+                            integerSort<VT>(globalHashVec.data(), index);
                         
                             for (size_t j=0; j < index; ++j){
                                 CrowIds[prefixSum[i]] = globalHashVec[j].first;
@@ -1145,7 +1153,7 @@ CSC<RIT, VT, CPT> SpMultiAddHashSliding(std::vector<CSC<RIT, VT, CPT>* > & matri
                         }
                 
                         //std::sort(globalHashVec.begin(), globalHashVec.begin() + index);
-                        integerSort<RIT>(globalHashVec.data(), index);
+                        integerSort<VT>(globalHashVec.data(), index);
                     
                         for (size_t j=0; j < index; ++j){
                             CrowIds[prefixSum[i]] = globalHashVec[j].first;
@@ -1173,7 +1181,7 @@ CSC<RIT, VT, CPT> SpMultiAddHashSliding(std::vector<CSC<RIT, VT, CPT>* > & matri
 #pragma omp barrier
     }
     t1 = omp_get_wtime();
-    //printf("%lf,", t1-t0);
+    printf("%lf,", t1-t0);
 
 #ifdef DEBUG
     printf("[Sliding Hash]\tTime for computation: %lf\n", t1-t0);
