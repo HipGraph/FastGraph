@@ -62,6 +62,7 @@ public:
 
     
     void GenER(int scale, int d, bool isWeighted, int64_t kRandSeed = 5102020);
+    void GenER(int rowscale, int colscale, int d, bool isWeighted, int64_t kRandSeed = 5102020);
     void GenRMAT(int scale, int d, bool isWeighted, int64_t kRandSeed = 5102020);
     void RandReLabel(int64_t randSeed, bool symmPerm=true);
     pvector<CIT>  NnzPerRow();
@@ -164,6 +165,65 @@ void COO<RIT, CIT, VT>:: BinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinn
         rowIdsBinned[pos] = nzRows_[i];
         if(isWeighted_) nzValsBinned[pos] = nzVals_[i];
     }
+}
+
+template <typename RIT, typename CIT, typename VT>
+void COO<RIT, CIT, VT>::GenER(int rowscale, int colscale, int d, bool isWeighted, int64_t kRandSeed)
+{
+    isWeighted_ = isWeighted;
+    nrows_ = 1l << rowscale;
+    ncols_ = 1l << colscale;
+    nnz_ = ncols_  * d;
+   
+    // blocking is done for random number generators
+    // one seed per block
+    // static const size_t block_size = 1<<16;
+    
+    Timer t;
+    t.Start();
+    nzRows_.resize(nnz_);
+    nzCols_.resize(nnz_);
+
+    size_t nthreads;
+    size_t block_size;
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
+            block_size = nnz_ / nthreads;
+        }
+    }
+
+    std::mt19937 rng;
+    rng.seed(kRandSeed);
+    std::vector<size_t> randSeeds(nthreads);
+    for (int t = 0; t < nthreads; t++) randSeeds[t] = rng();
+    
+    if(isWeighted_) nzVals_.resize(nnz_);
+#pragma omp parallel
+    {
+        std::mt19937 rng;
+        std::uniform_int_distribution<RIT> urdist(0, nrows_-1);
+        std::uniform_int_distribution<RIT> ucdist(0, ncols_-1);
+        std::uniform_int_distribution<RIT> udist(0, nnz_-1);
+        
+        int tid = omp_get_thread_num();
+        rng.seed(randSeeds[tid]);
+
+#pragma omp for
+        for (size_t block=0; block < nnz_; block+=block_size)
+        {
+            for (size_t i=block; i < std::min(block+block_size, nnz_); i++)
+            {
+                nzRows_[i] = urdist(rng);
+                nzCols_[i] = ucdist(rng);
+                if(isWeighted_) nzVals_[i] = static_cast<VT>(udist(rng)%255+1);
+            }
+        }
+    }
+    t.Stop();
+    //PrintTime("ER Generation Time", t.Seconds());
 }
 
 
