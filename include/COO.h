@@ -16,7 +16,7 @@
 #include "GAP/util.h"
 #include "GAP/pvector.h"
 #include "GAP/platform_atomics.h"
-
+#include "NIST/mmio.h"
 
 
 // RIT: Row Index Type
@@ -44,7 +44,6 @@ public:
     // The size of nzRows/nzRows/nzVals is nnz_
     // hence, index i cannot be RIT or CIT
     //------------------------------------------------
-    // Get
     RIT NzRows (size_t i) const { return nzRows_[i]; }
     CIT NzCols (size_t i) const { return nzCols_[i]; }
     VT NzVals (size_t i) const { return nzVals_[i]; }
@@ -60,7 +59,36 @@ public:
     CIT & NzCols (size_t i) { return nzCols_[i]; }
     VT & NzVals (size_t i) { return nzVals_[i]; }
 
-    
+    void ReadMM(std::string filename) {
+        FILE* f;
+        f = fopen(filename.c_str(), "r");
+
+        MM_typecode matcode;
+        mm_read_banner(f, &matcode);
+        int m, n, nz;
+        mm_read_mtx_crd_size(f, &m, &n, &nz);
+        nrows_ = (size_t)(m);
+        ncols_ = (size_t)(n);
+        nnz_ = (size_t)(nz);
+
+        nzRows_.resize(nnz_);
+        nzCols_.resize(nnz_);
+        nzVals_.resize(nnz_);
+
+        for(int i = 0; i < nnz_; i++){
+            int x;
+            int y;
+            float z;
+            fscanf(f, "%d %d %f\n", &x, &y, &z);
+            nzRows_[i] = (RIT)(x);
+            nzCols_[i] = (CIT)(y);
+            nzVals_[i] = (VT)(z);
+            nzRows_[i]--;
+            nzCols_[i]--;
+        }
+        
+        fclose(f);
+    }
     void GenER(int scale, int d, bool isWeighted, int64_t kRandSeed = 5102020);
     void GenER(int rowscale, int colscale, int d, bool isWeighted, int64_t kRandSeed = 5102020);
     void GenRMAT(int scale, int d, bool isWeighted, int64_t kRandSeed = 5102020);
