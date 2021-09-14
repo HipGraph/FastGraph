@@ -1,1 +1,13 @@
 *.swp
+*.o
+exp_scaling
+hash-regular-dynamic
+hash-regular-static
+hash-sliding-dynamic
+hash-sliding-static
+pairwise-serial-dynamic
+pairwise-serial-static
+pairwise-tree-dynamic
+pairwise-tree-static
+mkl-serial
+mkl-tree
