@@ -39,8 +39,12 @@ public:
 	CSC(): nrows_(0), ncols_(0), nnz_(0), isColSorted_(false) {}
 	//COO(nrows, ncols, nnz, isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), sort_type_(UNSORTED), isWeighted_(isWeighted); {NzList.resize(nnz_);}
 
-	CSC(RIT nrows, size_t ncols, size_t nnz,bool col_sort_bool, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), isColSorted_(col_sort_bool), isWeighted_(isWeighted) {
-		rowIds_.resize(nnz); colPtr_.resize(ncols+1); nzVals_.resize(nnz);}  // added by abhishek
+	CSC(RIT nrows, size_t ncols, size_t nnz,bool col_sort_bool, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), isColSorted_(col_sort_bool), isWeighted_(isWeighted) 
+    {
+		rowIds_.resize(nnz); 
+        colPtr_.resize(ncols+1); 
+        nzVals_.resize(nnz);
+    }  // added by abhishek
 
 	template <typename CIT>
 	CSC(COO<RIT, CIT, VT> & cooMat);

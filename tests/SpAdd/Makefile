@@ -11,74 +11,101 @@ LIB = -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_ilp64.a \
 	  ${MKLROOT}/lib/intel64/libmkl_core.a -Wl,--end-group -lgomp \
 	  -lpthread -lm -ldl
 
+mmio.o: $(NIST_DIR)/mmio.c
+	$(CC) -I$(NIST_DIR) -c -o mmio.o $(NIST_DIR)/mmio.c
+
+mmio.o: $(NIST_DIR)/mmio.c
+	$(CC) -I$(NIST_DIR) -c -o mmio.o $(NIST_DIR)/mmio.c
+
 exp_scaling.o: exp_scaling.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-exp_scaling: exp_scaling.o
+exp_scaling: exp_scaling.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
 hash-regular-static.o: hash-regular-static.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-hash-regular-static: hash-regular-static.o
+hash-regular-static: hash-regular-static.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
 hash-regular-dynamic.o: hash-regular-dynamic.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-hash-regular-dynamic: hash-regular-dynamic.o
+hash-regular-dynamic: hash-regular-dynamic.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
 hash-sliding-static.o: hash-sliding-static.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-hash-sliding-static: hash-sliding-static.o
+hash-sliding-static: hash-sliding-static.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
 hash-sliding-dynamic.o: hash-sliding-dynamic.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-hash-sliding-dynamic: hash-sliding-dynamic.o
+hash-sliding-dynamic: hash-sliding-dynamic.o mmio.o
+	$(CC) $^ -o $@ $(LIB)
+
+heap-dynamic.o: heap-dynamic.cpp
+	$(CC) -I${MKLROOT}/include -c $< -o $@
+
+heap-dynamic: heap-dynamic.o mmio.o
+	$(CC) $^ -o $@ $(LIB)
+
+heap-static.o: heap-static.cpp
+	$(CC) -I${MKLROOT}/include -c $< -o $@
+
+heap-static: heap-static.o mmio.o
+	$(CC) $^ -o $@ $(LIB)
+
+spa-dynamic.o: spa-dynamic.cpp
+	$(CC) -I${MKLROOT}/include -c $< -o $@
+
+spa-dynamic: spa-dynamic.o mmio.o
+	$(CC) $^ -o $@ $(LIB)
+
+spa-static.o: spa-static.cpp
+	$(CC) -I${MKLROOT}/include -c $< -o $@
+
+spa-static: spa-static.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
 pairwise-serial-dynamic.o: pairwise-serial-dynamic.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-pairwise-serial-dynamic: pairwise-serial-dynamic.o
+pairwise-serial-dynamic: pairwise-serial-dynamic.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
 pairwise-serial-static.o: pairwise-serial-static.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-pairwise-serial-static: pairwise-serial-static.o
+pairwise-serial-static: pairwise-serial-static.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
 pairwise-tree-dynamic.o: pairwise-tree-dynamic.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-pairwise-tree-dynamic: pairwise-tree-dynamic.o
+pairwise-tree-dynamic: pairwise-tree-dynamic.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
 pairwise-tree-static.o: pairwise-tree-static.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-pairwise-tree-static: pairwise-tree-static.o
+pairwise-tree-static: pairwise-tree-static.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
 mkl-serial.o: mkl-serial.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-mkl-serial: mkl-serial.o
+mkl-serial: mkl-serial.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
 mkl-tree.o: mkl-tree.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
-mkl-tree: mkl-tree.o
+mkl-tree: mkl-tree.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
-
-mmio.o: $(NIST_DIR)/mmio.c
-	$(CC) -I$(NIST_DIR) -c -o mmio.o $(NIST_DIR)/mmio.c
 
 comparison.o: comparison.cpp
 	$(CC) -I${MKLROOT}/include -c -o comparison.o comparison.cpp
@@ -86,7 +113,13 @@ comparison.o: comparison.cpp
 comparison: comparison.o mmio.o
 	$(CC) -o comparison comparison.o mmio.o
 
-all: exp_scaling comparison hash-regular-static hash-regular-dynamic hash-sliding-static hash-sliding-dynamic pairwise-serial-static pairwise-serial-dynamic pairwise-tree-static pairwise-tree-dynamic mkl-serial mkl-tree
+window.o: window.cpp
+	$(CC) -I${MKLROOT}/include -c -o window.o window.cpp
+
+window: window.o mmio.o
+	$(CC) -o window window.o mmio.o
+
+all: exp_scaling window comparison hash-regular-static hash-regular-dynamic hash-sliding-static hash-sliding-dynamic pairwise-serial-static pairwise-serial-dynamic pairwise-tree-static pairwise-tree-dynamic mkl-serial mkl-tree spa-static spa-dynamic heap-dynamic heap-static
 
 clean:
 	rm -f exp_scaling.o 
@@ -107,6 +140,14 @@ clean:
 	rm -f pairwise-tree-static
 	rm -f pairwise-tree-dynamic.o
 	rm -f pairwise-tree-dynamic
+	rm -f spa-static.o
+	rm -f spa-static
+	rm -f spa-dynamic.o
+	rm -f spa-dynamic
+	rm -f heap-static.o
+	rm -f heap-static
+	rm -f heap-dynamic.o
+	rm -f heap-dynamic
 	rm -f mkl-serial.o
 	rm -f mkl-serial
 	rm -f mkl-tree.o
@@ -114,3 +155,5 @@ clean:
 	rm -f mmio.o
 	rm -f comparison.o
 	rm -f comparison
+	rm -f window.o
+	rm -f window

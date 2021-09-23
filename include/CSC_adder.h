@@ -37,47 +37,6 @@ Note: ParallelPrefixSum from utils.h is used in here
 */
 
 //..........................................................................//
-
-template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM>
-pvector<RIT> symbolic_add_vec_of_matrices(std::vector<CSC<RIT, VT, CPT>* > &vec_of_matrices)
-{
-
-	CIT num_of_columns = vec_of_matrices[0]->get_ncols();
-
-	pvector<RIT> nz_per_column(num_of_columns);
-
-#pragma omp parallel for 
-	for(CIT i = 0; i < num_of_columns; i++){
-
-		std::unordered_map<RIT, VT> umap;
-		NM number_of_matrices = vec_of_matrices.size();
-
-		for(NM k = 0; k < number_of_matrices; k++){
-
-			const pvector<CPT> *col_ptr_i = vec_of_matrices[k]->get_colPtr();
-			const pvector<RIT> *row_ids_i = vec_of_matrices[k]->get_rowIds();
-
-			for(CPT j = (*col_ptr_i)[i]; j < (*col_ptr_i)[i+1]; j++){
-				umap[(*row_ids_i)[j] ] ++;
-			}
-
-			col_ptr_i = nullptr;
-			row_ids_i = nullptr;
-
-			delete col_ptr_i;
-			delete row_ids_i;
-
-		}
-		nz_per_column[i] = umap.size();
-	} 
-	// parallel programming ended
-	return std::move(nz_per_column);
-
-}
-
-
-
-
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM>
 pvector<RIT> symbolicSpMultiAddHashDynamic(std::vector<CSC<RIT, VT, CPT>* > &vec_of_matrices)
 {
@@ -287,268 +246,6 @@ pvector<RIT> symbolicSpMultiAddHashStatic(std::vector<CSC<RIT, VT, CPT>* > &vec_
     t1 = omp_get_wtime();
     return std::move(nz_per_column);
     
-}
-
-template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM>
-pvector<RIT> symbolicSpMultiAddHashSlidingDynamic(std::vector<CSC<RIT, VT, CPT>* > &matrices, const RIT windowSizeSymbolic, const RIT windowSize){
-    double t0, t1, t2, t3, t4, t5;
-
-    t0 = omp_get_wtime();
-    const RIT minHashTableSize = 16;
-    const RIT maxHashTableSize = windowSize;
-    const RIT maxHashTableSizeSymbolic = windowSizeSymbolic;
-    const RIT hashScale = 107;
-    //const RIT minHashTableSize = 2;
-    //const RIT maxHashTableSize = 5;
-    //const RIT maxHashTableSizeSymbolic = 5;
-    //const RIT hashScale = 3;
-    CIT nthreads;
-    CIT nsplits;
-    size_t nmatrices = matrices.size();
-    CIT ncols = matrices[0]->get_ncols();
-    RIT nrows = matrices[0]->get_nrows();
-    
-    pvector<double> ttimes; // To record time taken by each thread
-    pvector<CPT> splitters; // To store load balance friendly split of columns accross threads;
-
-    pvector<size_t> flopsPerCol(ncols);
-    pvector<size_t> nWindowPerColSymbolic(ncols); 
-    pvector<RIT> nWindowPerCol(ncols); 
-    pvector<RIT> nnzPerCol(ncols, 0);
-
-    t2 = omp_get_wtime();
-#pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        if(tid == 0){
-            nthreads = omp_get_num_threads();
-            nsplits = std::min(nthreads * 4, ncols); // More split for better load balance
-        }
-#pragma omp for
-        for(CPT i = 0; i < ncols; i++){
-            flopsPerCol[i] = 0;
-            for(int k = 0; k < nmatrices; k++){
-                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
-                flopsPerCol[i] += (*colPtr)[i+1] - (*colPtr)[i];
-            }
-            nWindowPerColSymbolic[i] = (flopsPerCol[i] / maxHashTableSizeSymbolic) + 1;
-        }
-    }
-    t3 = omp_get_wtime();
-
-    pvector<size_t> prefixSumSymbolic(ncols+1, 0);
-    ParallelPrefixSum(flopsPerCol, prefixSumSymbolic);
-
-    pvector<size_t> prefixSumWindowSymbolic(ncols+1, 0);
-    ParallelPrefixSum(nWindowPerColSymbolic, prefixSumWindowSymbolic);
-
-    pvector < std::pair<RIT, RIT> > nnzPerWindowSymbolic(prefixSumWindowSymbolic[ncols]);
-    
-    size_t flopsTot = prefixSumSymbolic[ncols];
-    size_t flopsPerThreadExpected;
-    size_t flopsPerSplitExpected;
-
-    ttimes.resize(nthreads);
-    splitters.resize(nsplits);
-    flopsPerSplitExpected = flopsTot / nsplits;
-    flopsPerThreadExpected = flopsTot / nthreads;
-    
-    t1 = omp_get_wtime();
-    
-    size_t cacheL1 = 32 * 1024;
-    size_t elementsToFitL1 = cacheL1 / sizeof( std::pair<RIT,RIT> ); // 32KB L1 cache / 8B element size = 4096 elements needed to fit cache line
-    size_t padding = std::max(elementsToFitL1, nmatrices); 
-    pvector< std::pair< RIT, RIT > > rowIdsRange(padding * nthreads); // Padding to avoid false sharing
-
-    t0 = omp_get_wtime();
-#pragma omp parallel
-    {
-        double ttime = omp_get_wtime();
-        std::vector<RIT> globalHashVec(minHashTableSize);
-        size_t tid = omp_get_thread_num();
-#pragma omp for
-        for(size_t s = 0; s < nsplits; s++){
-            splitters[s] = std::lower_bound(prefixSumSymbolic.begin(), prefixSumSymbolic.end(), s * flopsPerSplitExpected) - prefixSumSymbolic.begin();
-        }
-#pragma omp for schedule(dynamic)
-        for (size_t s = 0; s < nsplits; s++){
-            CPT colStart = splitters[s];
-            CPT colEnd = (s < nsplits-1) ? splitters[s+1] : ncols;
-            for(CPT i = colStart; i < colEnd; i++){
-                nnzPerCol[i] = 0;
-                nWindowPerCol[i] = 1;
-                size_t nwindows = nWindowPerColSymbolic[i];
-                if (nwindows == 1){
-                    RIT rowStart = 0;
-                    RIT  rowEnd = nrows;
-                    size_t wIdx = prefixSumWindowSymbolic[i];
-
-                    nnzPerWindowSymbolic[wIdx].first = 0;
-                    nnzPerWindowSymbolic[wIdx].second = 0;
-
-                    size_t flopsWindow = flopsPerCol[i];
-                    size_t htSize = minHashTableSize;
-                    while(htSize < flopsWindow) //htSize is set as 2^n
-                    {
-                        htSize <<= 1;
-                    }
-                    if(globalHashVec.size() < htSize) globalHashVec.resize(htSize);
-                    for(size_t j=0; j < htSize; ++j){
-                        globalHashVec[j] = -1;
-                    }
-
-                    for(size_t k = 0; k < nmatrices; k++){
-                        const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
-                        const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
-
-                        auto first = rowIds->begin() + (*colPtr)[i];
-                        auto last = rowIds->begin() + (*colPtr)[i+1];
-                        
-                        for(; first<last; first++){
-                            RIT key = *first;
-                            RIT hash = (key*hashScale) & (htSize-1);
-                            while (1) //hash probing
-                            {
-                                if (globalHashVec[hash] == key) //key is found in hash table
-                                {
-                                    break;
-                                }
-                                else if (globalHashVec[hash] == -1) //key is not registered yet
-                                {
-                                    globalHashVec[hash] = key;
-                                    nnzPerCol[i]++;
-                                    nnzPerWindowSymbolic[wIdx].second++;
-                                    break;
-                                }
-                                else //key is not found
-                                {
-                                    hash = (hash+1) & (htSize-1);
-                                }
-                            }
-                        }
-                    }
-                }
-                else{
-                    RIT nrowsPerWindow = nrows / nwindows;
-                    RIT runningSum = 0;
-                    for(size_t w = 0; w < nwindows; w++){
-                        RIT rowStart = w * nrowsPerWindow;
-                        RIT rowEnd = (w == nwindows-1) ? nrows : (w+1) * nrowsPerWindow;
-
-                        int64_t wIdx = prefixSumWindowSymbolic[i] + w;
-
-                        nnzPerWindowSymbolic[wIdx].first = rowStart;
-                        nnzPerWindowSymbolic[wIdx].second = 0;
-
-                        size_t flopsWindow = 0;
-
-                        for(int k = 0; k < nmatrices; k++){
-                            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
-                            const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
-
-                            auto first = rowIds->begin() + (*colPtr)[i];
-                            auto last = rowIds->begin() + (*colPtr)[i+1];
-                            size_t startIdx, endIdx, midIdx;
-
-                            if(rowStart > 0){
-                                startIdx = (*colPtr)[i];
-                                endIdx = (*colPtr)[i+1];
-                                midIdx = (startIdx + endIdx) / 2;
-                                while(startIdx < endIdx){
-                                    if((*rowIds)[midIdx] < rowStart) startIdx = midIdx + 1;
-                                    else endIdx = midIdx;
-                                    midIdx = (startIdx + endIdx) / 2;
-                                }
-                                first = rowIds->begin() + endIdx;
-                                //first = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowStart );
-                            }
-
-                            if(rowEnd < nrows){
-                                startIdx = (*colPtr)[i];
-                                endIdx = (*colPtr)[i+1];
-                                midIdx = (startIdx + endIdx) / 2;
-                                while(startIdx < endIdx){
-                                    if((*rowIds)[midIdx] < rowEnd) startIdx = midIdx + 1;
-                                    else endIdx = midIdx;
-                                    midIdx = (startIdx + endIdx) / 2;
-                                }
-                                last = rowIds->begin() + endIdx;
-                                //last = std::lower_bound( rowIds->begin() + (*colPtr)[i], rowIds->begin() + (*colPtr)[i+1], rowEnd );
-                            }
-                            rowIdsRange[tid * padding + k].first = first - rowIds->begin();
-                            rowIdsRange[tid * padding + k].second = last - rowIds->begin();
-
-                            flopsWindow += last-first;
-                        }
-
-                        size_t htSize = minHashTableSize;
-                        while(htSize < flopsWindow) //htSize is set as 2^n
-                        {
-                            htSize <<= 1;
-                        }
-                        if(globalHashVec.size() < htSize) globalHashVec.resize(htSize);
-                        for(size_t j=0; j < htSize; ++j){
-                            globalHashVec[j] = -1;
-                        }
-
-                        for(int k = 0; k < nmatrices; k++)
-                        {
-                            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
-                            const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
-
-                            auto first = rowIds->begin() + rowIdsRange[tid  * padding + k].first;
-                            auto last = rowIds->begin() + rowIdsRange[tid * padding + k].second;
-                            
-                            for(; first<last; first++){
-                                RIT key = *first;
-                                RIT hash = (key*hashScale) & (htSize-1);
-                                while (1) //hash probing
-                                {
-                                    if (globalHashVec[hash] == key) //key is found in hash table
-                                    {
-                                        break;
-                                    }
-                                    else if (globalHashVec[hash] == -1) //key is not registered yet
-                                    {
-                                        globalHashVec[hash] = key;
-                                        nnzPerCol[i]++;
-                                        nnzPerWindowSymbolic[wIdx].second++;
-                                        break;
-                                    }
-                                    else //key is not found
-                                    {
-                                        hash = (hash+1) & (htSize-1);
-                                    }
-                                }
-                            }
-                        }
-                        if (w == 0){
-                            //nWindowPerCol[i] = 1;
-                            runningSum = nnzPerWindowSymbolic[wIdx].second;
-                        }
-                        else{
-                            if(runningSum + nnzPerWindowSymbolic[wIdx].second > maxHashTableSize){
-                                nWindowPerCol[i]++;
-                                runningSum = nnzPerWindowSymbolic[wIdx].second;
-                            }
-                            else{
-                                runningSum = runningSum + nnzPerWindowSymbolic[wIdx].second;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        ttime = omp_get_wtime() - ttime;
-        ttimes[tid] = ttime;
-    }
-    t1 = omp_get_wtime();
-    printf("[Sliding Hash]\tTime for symbolic: %lf\n", t1-t0);
-    printf("[Sliding Hash]\tStats of time consumed by threads:\n");
-    getStats<double>(ttimes, true);
-    printf("---\n");
-
-    return std::move(nnzPerCol);
 }
 
 
@@ -1946,8 +1643,12 @@ CSC<RIT, VT, CPT> SpMultiAddHashSlidingStatic(std::vector<CSC<RIT, VT, CPT>* > &
     return std::move(sumMat);
 }
 
+/*
+ * Sparse allocator based k-way sparse addition
+ * using dynamic load balancing strategy
+ * */
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
-CSC<RIT, VT, CPT> SpMultiAddSpA(std::vector<CSC<RIT, VT, CPT>* > & matrices)
+CSC<RIT, VT, CPT> SpMultiAddSpADynamic(std::vector<CSC<RIT, VT, CPT>* > & matrices)
 {
     double t0, t1, t2, t3;
 
@@ -2108,12 +1809,157 @@ CSC<RIT, VT, CPT> SpMultiAddSpA(std::vector<CSC<RIT, VT, CPT>* > & matrices)
     return std::move(sumMat);
 }
 
+template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
+CSC<RIT, VT, CPT> SpMultiAddSpAStatic(std::vector<CSC<RIT, VT, CPT>* > & matrices)
+{
+    double t0, t1, t2, t3;
+
+    size_t nmatrices = matrices.size();
+    CIT ncols = matrices[0]->get_ncols();
+    RIT nrows = matrices[0]->get_nrows();
+
+    pvector<CPT> nnzPerCol(ncols);
+    pvector<CPT> flops_per_column(ncols, 0);
+
+    t0 = omp_get_wtime();
+#pragma omp parallel for
+    for(CIT i = 0; i < ncols; i++){
+        for(int k = 0; k < nmatrices; k++){
+            const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+            flops_per_column[i] += (*colPtr)[i+1] - (*colPtr)[i];
+        }
+    }
+    t1 = omp_get_wtime();
+
+    pvector<CPT> prefix_sum(ncols+1);
+    ParallelPrefixSum(flops_per_column, prefix_sum);
+    
+    int64_t flops_tot = prefix_sum[ncols];
+    int64_t flops_per_thread_expected;
+    int64_t flops_per_split_expected;
+    
+    CIT nthreads;
+    CIT nsplits;
+    pvector<CIT> splitters;
+    pvector<double> ttimes;
+    
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        double ttime = omp_get_wtime();
+        std::vector< RIT > globalHashVec(nrows);
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
+            nsplits = std::min( nthreads*4, ncols );
+            splitters.resize(nsplits);
+            ttimes.resize(nthreads);
+            flops_per_thread_expected = flops_tot / nthreads;
+            flops_per_split_expected = flops_tot / nsplits;
+        }
+#pragma omp for schedule(static)
+        for(CIT i = 0; i < ncols; i++){
+            nnzPerCol[i] = 0;
+            for(size_t j=0; j < nrows; ++j) globalHashVec[j] = -1;
+        
+            for(int k = 0; k < nmatrices; k++){
+                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+            
+                for(CPT j = (*colPtr)[i]; j < (*colPtr)[i+1]; j++)
+                {
+                    RIT key = (*rowIds)[j];
+                    if (globalHashVec[key] == -1) {
+                        globalHashVec[key] = key;
+                        nnzPerCol[i]++;
+                    }
+                }
+            }
+        }
+        ttime = omp_get_wtime() - ttime;
+        //ttimes[tid] = ttime;
+    }
+    t1 = omp_get_wtime();
+
+    ParallelPrefixSum(nnzPerCol, prefix_sum);
+    
+    pvector<CPT> CcolPtr(prefix_sum.begin(), prefix_sum.end());
+    pvector<RIT> CrowIds(prefix_sum[ncols]);
+    pvector<VT> CnzVals(prefix_sum[ncols]);
+
+    CSC<RIT, VT, CPT> sumMat(nrows, ncols, prefix_sum[ncols], false, true);
+    sumMat.cols_pvector(&CcolPtr);
+    
+    CPT nnzCTot = prefix_sum[ncols];
+    CPT nnzCPerThreadExpected = nnzCTot / nthreads;
+    CPT nnzCPerSplitExpected = nnzCTot / nsplits;
+
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        double ttime = omp_get_wtime();
+        int tid = omp_get_thread_num();
+        std::vector< std::pair<RIT,VT>> globalHashVec(nrows);
+#pragma omp for schedule(static) 
+        for(CPT i = 0; i < ncols; i++){
+            if(nnzPerCol[i] != 0){
+                for(size_t j=0; j < nrows; ++j) globalHashVec[j].first = -1;
+            
+                for(int k = 0; k < nmatrices; k++)
+                {
+                    const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                    const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                    const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+                
+                    for(CPT j = (*colPtr)[i]; j < (*colPtr)[i+1]; j++)
+                    {
+                        RIT key = (*rowIds)[j];
+                        VT curval = (*nzVals)[j];
+                        if (globalHashVec[key].first == key) //key is found in hash table
+                        {
+                            globalHashVec[key].second += curval;
+                        }
+                        else if (globalHashVec[key].first == -1) //key is not registered yet
+                        {
+                            globalHashVec[key].first = key;
+                            globalHashVec[key].second = curval;
+                        }
+                    }
+                }
+           
+                for (size_t j=0; j < nrows; ++j){
+                    if (globalHashVec[j].first != -1){
+                        CrowIds[prefix_sum[i]] = globalHashVec[j].first;
+                        CnzVals[prefix_sum[i]] = globalHashVec[j].second;
+                        prefix_sum[i]++;
+                    }
+                }
+            }
+        } // parallel programming ended
+        ttime = omp_get_wtime() - ttime;
+        //ttimes[tid] = ttime;
+#pragma omp barrier
+    }
+    t1 = omp_get_wtime();
+
+    Timer clock;
+    clock.Start();
+
+    sumMat.nz_rows_pvector(&CrowIds);
+    sumMat.nz_vals_pvector(&CnzVals);
+
+    clock.Stop();
+    return std::move(sumMat);
+}
+
 /*
  *  Estimates nnumber of non-zeroes when adding two CSC matrices in regular way
  *  Assumes that entries of each column are sorted according to the order of row id
  * */
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
-pvector<RIT> symbolicSpAddRegularDynamic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B){
+pvector<RIT> symbolicSpAddRegularDynamic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B)
+{
     double t0, t1, t3, t4;
 
     CIT nthreads;
@@ -2232,7 +2078,8 @@ pvector<RIT> symbolicSpAddRegularDynamic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>
  *  Assumes that entries of each column are sorted according to the order of row id
  * */
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
-pvector<RIT> symbolicSpAddRegularStatic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B){
+pvector<RIT> symbolicSpAddRegularStatic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B)
+{
     double t0, t1, t3, t4;
 
     CIT nthreads;
@@ -2334,7 +2181,8 @@ pvector<RIT> symbolicSpAddRegularStatic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>*
  *  Assumes that all sanity checks are done before, so do not perform any
  * */
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
-CSC<RIT, VT, CPT> SpAddRegularDynamic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, pvector<RIT> & nnzCPerCol){
+CSC<RIT, VT, CPT> SpAddRegularDynamic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, pvector<RIT> & nnzCPerCol)
+{
     double t0, t1, t3, t4;
 
     CIT nthreads;
@@ -2456,7 +2304,8 @@ CSC<RIT, VT, CPT> SpAddRegularDynamic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B
  *  Assumes that all sanity checks are done before, so do not perform any
  * */
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
-CSC<RIT, VT, CPT> SpAddRegularStatic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, pvector<RIT> & nnzCPerCol){
+CSC<RIT, VT, CPT> SpAddRegularStatic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B, pvector<RIT> & nnzCPerCol)
+{
     double t0, t1, t3, t4;
 
     CIT nthreads;
@@ -2553,525 +2402,433 @@ CSC<RIT, VT, CPT> SpAddRegularStatic(CSC<RIT, VT, CPT>* A, CSC<RIT, VT, CPT>* B,
     return std::move(C);
 }
 
-template <typename RIT, typename VT, typename NM>
-struct heap_help{
-	RIT hh_row_number;
-	VT hh_element;
-	NM hh_matrix_number;
+// MUST DO: Need to use template.
+bool compare(std::tuple<uint32_t, float, int> x, std::tuple<uint32_t, float, int> y){
+    if(std::get<0>(x) < std::get<0>(y)) return false;
+    else return true;
+}
 
-	heap_help() : hh_row_number(0), hh_element(0), hh_matrix_number(0){}
-	heap_help(RIT temp1, VT temp2, NM temp3) : hh_row_number(temp1), hh_element(temp2), hh_matrix_number(temp3){}
+//template <typename RIT, typename VT>
+//bool compare(std::tuple<size_t, RIT, VT> x, std::tuple<size_t, RIT, VT> y){
+    //if(std::get<0>(x) > std::get<0>(y)) return false;
+    //else return true;
+//}
 
-	template <typename RIT_1, typename VT_1, typename NM_1>
-	bool operator< (const heap_help<RIT_1, VT_1, NM_1 > & other) const{
-		return this->hh_row_number > other.hh_row_number; // < here is inverted on purpose so as use .top() of priority queue to extract minimum
-	}
-};
+template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
+CSC<RIT, VT, CPT> SpMultiAddHeapDynamic(std::vector<CSC<RIT, VT, CPT>* > &matrices){
 
-
-template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM>
-CSC<RIT, VT, CPT> SpMultiAddHeap(std::vector<CSC<RIT, VT, CPT>* > &vec_of_matrices){
-    double t0, t1, t2, t3;
-	assert(vec_of_matrices.size() != 0);
-
-	CIT num_of_columns = vec_of_matrices[0]->get_ncols();
-	RIT num_of_rows = vec_of_matrices[0]->get_nrows();
-    NM number_of_matrices = vec_of_matrices.size();
-
-#pragma omp parallel for
-	for(NM i = 0; i < vec_of_matrices.size(); i++){
-		assert(num_of_columns == vec_of_matrices[i]->get_ncols());
-		assert(num_of_rows == vec_of_matrices[i]->get_nrows());
-	}
-
-    pvector<RIT> flops_per_column(num_of_columns, 0);
+    double t0, t1, t2, t3, t4, t5;
 
     t0 = omp_get_wtime();
-#pragma omp parallel for
-    for(CIT i = 0; i < num_of_columns; i++){
-        for(int k = 0; k < number_of_matrices; k++){
-            const pvector<CPT> *colPtr = vec_of_matrices[k]->get_colPtr();
-            flops_per_column[i] += (*colPtr)[i+1] - (*colPtr)[i];
-        }
-    }
-    t1 = omp_get_wtime();
-
-    pvector<CPT> prefix_sum(num_of_columns+1);
-    ParallelPrefixSum(flops_per_column, prefix_sum);
-    
-    int64_t flops_tot = prefix_sum[num_of_columns];
-    int64_t flops_per_thread_expected;
-    int64_t flops_per_split_expected;
-    
     CIT nthreads;
     CIT nsplits;
-    pvector<CIT> splitters;
-    pvector<double> ttimes;
-	pvector<RIT> nz_per_column(num_of_columns, 0); 
+    size_t nmatrices = matrices.size();
+    CIT ncols = matrices[0]->get_ncols();
+    RIT nrows = matrices[0]->get_nrows();
+    
+    pvector<double> ttimes; // To record time taken by each thread
+    pvector<CPT> splitters; // To store load balance friendly split of columns accross threads;
+
+    pvector<size_t> flopsPerCol(ncols);
+    pvector<RIT> nnzPerCol(ncols, 0);
+
+    t2 = omp_get_wtime();
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
+            nsplits = std::min(nthreads * 4, ncols); // More split for better load balance
+        }
+#pragma omp for
+        for(CPT i = 0; i < ncols; i++){
+            flopsPerCol[i] = 0;
+            for(int k = 0; k < nmatrices; k++){
+                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                flopsPerCol[i] += (*colPtr)[i+1] - (*colPtr)[i];
+            }
+        }
+    }
+    t3 = omp_get_wtime();
+
+    pvector<size_t> prefixSumSymbolic(ncols+1, 0);
+    ParallelPrefixSum(flopsPerCol, prefixSumSymbolic);
+    
+    size_t flopsTot = prefixSumSymbolic[ncols];
+    size_t flopsPerThreadExpected;
+    size_t flopsPerSplitExpected;
+
+    ttimes.resize(nthreads);
+    splitters.resize(nsplits);
+    flopsPerSplitExpected = flopsTot / nsplits;
+    flopsPerThreadExpected = flopsTot / nthreads;
+    
+    t1 = omp_get_wtime();
     
     t0 = omp_get_wtime();
 #pragma omp parallel
     {
         int tid = omp_get_thread_num();
-        std::priority_queue<heap_help<RIT, VT, NM> > pq;
-        pvector<RIT> current_index_of_specific_matrix(number_of_matrices);
-        if(tid == 0){
-            nthreads = omp_get_num_threads();
-            nsplits = std::min( nthreads*4, num_of_columns );
-            splitters.resize(nsplits);
-            ttimes.resize(nthreads);
-            flops_per_thread_expected = flops_tot / nthreads;
-            flops_per_split_expected = flops_tot / nsplits;
-        }
-#pragma omp barrier
+        std::vector< std::tuple<RIT, VT, int> > heap(nmatrices);
+        std::vector< CPT > curptr(nmatrices, static_cast<CPT>(0));
+        CPT hsize = 0;
 #pragma omp for
         for (size_t s = 0; s < nsplits; s++){
-            splitters[s] = std::lower_bound(prefix_sum.begin(), prefix_sum.end(), s * flops_per_split_expected) - prefix_sum.begin();
+            splitters[s] = std::lower_bound(prefixSumSymbolic.begin(), prefixSumSymbolic.end(), s * flopsPerSplitExpected) - prefixSumSymbolic.begin();
         }
 #pragma omp barrier
 #pragma omp for schedule(dynamic)
         for (size_t s = 0; s < nsplits; s++) {
             CIT colStart = splitters[s];
-            CIT colEnd = (s < nsplits-1) ? splitters[s+1] : num_of_columns;
+            CIT colEnd = (s < nsplits-1) ? splitters[s+1] : ncols;
             for(CIT i = colStart; i < colEnd; i++){
-                for(NM j = 0; j < number_of_matrices; j++){
-                    current_index_of_specific_matrix[j] = 0;
-                    const pvector<CPT> *col_ptr_j = vec_of_matrices[j]->get_colPtr();
-                    const pvector<RIT> *row_ids_j = vec_of_matrices[j]->get_rowIds();
-                    const pvector<VT> *nz_j = vec_of_matrices[j]->get_nzVals();
+                hsize = 0;
+                for(int k = 0; k < nmatrices; k++){
+                    curptr[k] = 0;
+                    const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                    const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                    const pvector<VT> *nzVals = matrices[k]->get_nzVals();
 
-                    if( (*col_ptr_j)[i] + current_index_of_specific_matrix[j] < (*col_ptr_j)[i+1] ){
-                        RIT temp1_row = (*row_ids_j)[(*col_ptr_j)[i] + current_index_of_specific_matrix[j]] ;
-                        VT temp1_value = (*nz_j)[(*col_ptr_j)[i] + current_index_of_specific_matrix[j]] ;
-                        pq.push(heap_help<RIT, VT, NM> (temp1_row, temp1_value, j));
-                        current_index_of_specific_matrix[j]++;
+                    RIT j = (*colPtr)[i] + curptr[k];
+                    if(j < (*colPtr)[i+1]){
+                        heap[hsize] = std::make_tuple((*rowIds)[j], (*nzVals)[j], k);
+                        hsize++;
+                        curptr[k]++;
                     }
                 }
 
-                bool flag = false;
-                while(!pq.empty()){
-                    nz_per_column[i]++;
-                    RIT r = pq.top().hh_row_number;
-                    while(!pq.empty() && r == pq.top().hh_row_number){
-                        heap_help<RIT, VT, NM> elem = pq.top();
-                        pq.pop();
-                        NM j = elem.hh_matrix_number;
-                        current_index_of_specific_matrix[j]++;
+                std::make_heap(heap.data(), heap.data()+hsize, compare);
+                //for(int x = 0; x < hsize; x++){
+                    //printf("(%d, %d) ", std::get<0>(heap[x]), std::get<2>(heap[x]));
+                //}
+                //printf("\n");
 
-                        const pvector<CPT> *col_ptr_j = vec_of_matrices[j]->get_colPtr();
-                        const pvector<RIT> *row_ids_j = vec_of_matrices[j]->get_rowIds();
-                        const pvector<VT> *nz_j = vec_of_matrices[j]->get_nzVals();
+                nnzPerCol[i] = 0;
+                RIT lastPoppedRow = -1;
+                while(hsize > 0){
+                    std::pop_heap(heap.data(), heap.data()+hsize, compare);
 
-                        if( (*col_ptr_j)[i] + current_index_of_specific_matrix[j] < (*col_ptr_j)[i+1] ){
-                            RIT temp1_row = (*row_ids_j)[(*col_ptr_j)[i] + current_index_of_specific_matrix[j]] ;
-                            VT temp1_value = (*nz_j)[(*col_ptr_j)[i] + current_index_of_specific_matrix[j]] ;
-                            pq.push(heap_help<RIT, VT, NM> (temp1_row, temp1_value, j));
-                        }
+                    //for(int x = 0; x < hsize; x++){
+                        //printf("(%d, %d) ", std::get<0>(heap[x]), std::get<2>(heap[x]));
+                    //}
+                    //printf("\n");
+
+                    int k = std::get<2>(heap[hsize-1]);
+                    RIT r = std::get<0>(heap[hsize-1]);
+
+                    if(r != lastPoppedRow){
+                        nnzPerCol[i]++;
+                        lastPoppedRow = r;
+                    }
+
+                    const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                    const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                    const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+
+                    RIT j = (*colPtr)[i] + curptr[k];
+                    if(j < (*colPtr)[i+1]){
+                        heap[hsize-1] = std::make_tuple((*rowIds)[j], (*nzVals)[j], k);
+                        std::push_heap(heap.data(), heap.data()+hsize, compare);
+                        curptr[k]++;
+                    }
+                    else{
+                        hsize--;
                     }
                 }
             }
         }
     }
 
+    pvector<size_t> prefixSum(ncols+1, 0);
+    ParallelPrefixSum(nnzPerCol, prefixSum);
 
-	ParallelPrefixSum(nz_per_column, prefix_sum);
-	pvector<CPT> column_vector_for_csc(prefix_sum.begin(), prefix_sum.end());
-	pvector<VT> value_vector_for_csc(prefix_sum[num_of_columns]);
-	pvector<RIT> row_vector_for_csc(prefix_sum[num_of_columns]);
-
-    int64_t nnz_tot = prefix_sum[num_of_columns];
-    int64_t nnz_per_thread_expected = nnz_tot / nthreads;
-    int64_t nnz_per_split_expected = nnz_tot / nsplits;
-
+    pvector<CPT> CcolPtr(prefixSum.begin(), prefixSum.end());
+    pvector<RIT> CrowIds(prefixSum[ncols]);
+    pvector<VT> CnzVals(prefixSum[ncols]);
+    CSC<RIT, VT, CPT> sumMat(nrows, ncols, prefixSum[ncols], false, true);
+    sumMat.cols_pvector(&CcolPtr);
+    
+    CPT nnzCTot = prefixSum[ncols];
+    CPT nnzCPerThreadExpected = nnzCTot / nthreads;
+    CPT nnzCPerSplitExpected = nnzCTot / nsplits;
+    
+    pvector<double> colTimes(ncols);
+    
+    t0 = omp_get_wtime();
 #pragma omp parallel
     {
         int tid = omp_get_thread_num();
-        std::priority_queue<heap_help<RIT, VT, NM> > pq;
-        pvector<RIT> current_index_of_specific_matrix(number_of_matrices);
-#pragma omp barrier
+        std::vector< std::tuple<RIT, VT, int> > heap(nmatrices);
+        std::vector< CPT > curptr(nmatrices, static_cast<CPT>(0));
+        CPT hsize = 0;
 #pragma omp for
-        for (size_t s = 0; s < nsplits; s++){
-            splitters[s] = std::lower_bound(prefix_sum.begin(), prefix_sum.end(), s * nnz_per_split_expected) - prefix_sum.begin();
+        for(size_t s = 0; s < nsplits; s++){
+            splitters[s] = std::lower_bound(prefixSum.begin(), prefixSum.end(), s * nnzCPerSplitExpected) - prefixSum.begin();
         }
 #pragma omp barrier
 #pragma omp for schedule(dynamic)
         for (size_t s = 0; s < nsplits; s++) {
             CIT colStart = splitters[s];
-            CIT colEnd = (s < nsplits-1) ? splitters[s+1] : num_of_columns;
+            CIT colEnd = (s < nsplits-1) ? splitters[s+1] : ncols;
             for(CIT i = colStart; i < colEnd; i++){
-                for(NM j = 0; j < number_of_matrices; j++){
-                    current_index_of_specific_matrix[j] = 0;
-                    const pvector<CPT> *col_ptr_j = vec_of_matrices[j]->get_colPtr();
-                    const pvector<RIT> *row_ids_j = vec_of_matrices[j]->get_rowIds();
-                    const pvector<VT> *nz_j = vec_of_matrices[j]->get_nzVals();
+                hsize = 0;
+                for(int k = 0; k < nmatrices; k++){
+                    curptr[k] = 0;
+                    const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                    const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                    const pvector<VT> *nzVals = matrices[k]->get_nzVals();
 
-                    if( (*col_ptr_j)[i] + current_index_of_specific_matrix[j] < (*col_ptr_j)[i+1] )
-                    {
-                        RIT temp1_row = (*row_ids_j)[(*col_ptr_j)[i] + current_index_of_specific_matrix[j]] ;
-                        VT temp1_value = (*nz_j)[(*col_ptr_j)[i] + current_index_of_specific_matrix[j]] ;
-                        pq.push(heap_help<RIT, VT, NM> (temp1_row, temp1_value, j));
-                        current_index_of_specific_matrix[j]++;
+                    RIT j = (*colPtr)[i] + curptr[k];
+                    if(j < (*colPtr)[i+1]){
+                        heap[hsize] = std::make_tuple((*rowIds)[j], (*nzVals)[j], k);
+                        hsize++;
+                        curptr[k]++;
                     }
                 }
 
-                bool first_entry_check = false;
-                while(! pq.empty()){
-                    heap_help<RIT, VT, NM> temp1 = pq.top(); // T as long double
-                    pq.pop();
-                    if(!first_entry_check){
-                        value_vector_for_csc[prefix_sum[i]] = temp1.hh_element;
-                        row_vector_for_csc[prefix_sum[i]] = temp1.hh_row_number;
-                        prefix_sum[i]++;
-                        first_entry_check = true;
+                std::make_heap(heap.data(), heap.data()+hsize, compare);
+
+                nnzPerCol[i] = 0;
+                RIT lastPoppedRow = -1;
+                CPT idx = -1;
+                while(hsize > 0){
+                    std::pop_heap(heap.data(), heap.data()+hsize, compare);
+
+                    //for(int x = 0; x < hsize; x++){
+                        //printf("(%d, %d) ", std::get<0>(heap[x]), std::get<2>(heap[x]));
+                    //}
+                    //printf("\n");
+
+                    int k = std::get<2>(heap[hsize-1]);
+                    RIT r = std::get<0>(heap[hsize-1]);
+                    VT v = std::get<1>(heap[hsize-1]);
+
+                    if(r != lastPoppedRow){
+                        lastPoppedRow = r;
+                        CrowIds[prefixSum[i]] = r;
+                        CnzVals[prefixSum[i]] = v;
+                        prefixSum[i]++;
                     }
                     else{
-                        if(row_vector_for_csc[prefix_sum[i] - 1] == temp1.hh_row_number){
-                            value_vector_for_csc[prefix_sum[i] - 1] += temp1.hh_element;
-                        }
-                        else{
-                            value_vector_for_csc[prefix_sum[i]] = temp1.hh_element;
-                            row_vector_for_csc[prefix_sum[i]] = temp1.hh_row_number;
-                            prefix_sum[i]++;
-                        }
+                        CnzVals[prefixSum[i]-1] += v;
                     }
 
-                    NM matrix_removed_from_pq = temp1.hh_matrix_number;
-                    const pvector<CPT> *col_ptr_j = vec_of_matrices[matrix_removed_from_pq]->get_colPtr();
-                    const pvector<RIT> *row_ids_j = vec_of_matrices[matrix_removed_from_pq]->get_rowIds();
-                    const pvector<VT> *nz_j = vec_of_matrices[matrix_removed_from_pq]->get_nzVals();
+                    const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                    const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                    const pvector<VT> *nzVals = matrices[k]->get_nzVals();
 
-                    if( (*col_ptr_j)[i] + current_index_of_specific_matrix[matrix_removed_from_pq] < (*col_ptr_j)[i+1] )
-                    {
-                        RIT temp1_row = (*row_ids_j)[(*col_ptr_j)[i] + current_index_of_specific_matrix[matrix_removed_from_pq]] ;
-                        VT temp1_value = (*nz_j)[(*col_ptr_j)[i] + current_index_of_specific_matrix[matrix_removed_from_pq]] ;
-
-                        pq.push(heap_help<RIT, VT, NM> (temp1_row, temp1_value, matrix_removed_from_pq));
-                        current_index_of_specific_matrix[matrix_removed_from_pq]++;
+                    RIT j = (*colPtr)[i] + curptr[k];
+                    if(j < (*colPtr)[i+1]){
+                        heap[hsize-1] = std::make_tuple((*rowIds)[j], (*nzVals)[j], k);
+                        std::push_heap(heap.data(), heap.data()+hsize, compare);
+                        curptr[k]++;
                     }
-
-                } //end while
+                    else{
+                        hsize--;
+                    }
+                }
             }
         }
     }
 
-	CSC<RIT, VT, CPT> result_matrix_csc(num_of_rows, num_of_columns, column_vector_for_csc[num_of_columns], true, true);
-	result_matrix_csc.nz_rows_pvector(&row_vector_for_csc);
-	result_matrix_csc.cols_pvector(&column_vector_for_csc);
-	result_matrix_csc.nz_vals_pvector(&value_vector_for_csc);
-
-	return std::move(result_matrix_csc);
-
+    sumMat.nz_rows_pvector(&CrowIds);
+    sumMat.nz_vals_pvector(&CnzVals);
+    return std::move(sumMat);
 }
 
-
-//..........................................................................//
-
-
-template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM>
-
-pvector<std::tuple<RIT,size_t,RIT> > symbolic_add_vec_of_matrices_modified(std::vector<CSC<RIT, VT, CPT>* > &vec_of_matrices)   // gives a tuple of rows in final sum, total elements in a column over all matrices, max row number in a column all required for radix sort.
-{
-
-	CIT num_of_columns = vec_of_matrices[0]->get_ncols();
-
-	pvector<std::tuple<RIT,size_t,RIT> > nz_per_column(num_of_columns);
-
-#pragma omp parallel for
-	for(CIT i = 0; i < num_of_columns; i++){
-
-		RIT max_row_number = 0;
-		size_t total_elements = 0;
-		std::unordered_map<RIT, VT> umap;
-		NM number_of_matrices = vec_of_matrices.size();
-
-		for(NM k = 0; k < number_of_matrices; k++){
-
-			const pvector<CPT> *col_ptr_i = vec_of_matrices[k]->get_colPtr();
-			const pvector<RIT> *row_ids_i = vec_of_matrices[k]->get_rowIds();
-
-			for(CPT j = (*col_ptr_i)[i]; j < (*col_ptr_i)[i+1]; j++){
-				umap[(*row_ids_i)[j] ] ++;
-				max_row_number = std::max(max_row_number, (*row_ids_i)[j]);
-			}
-
-			total_elements += (*col_ptr_i)[i+1] - (*col_ptr_i)[i];
-
-			col_ptr_i = nullptr;
-			row_ids_i = nullptr;
-
-			delete col_ptr_i;
-			delete row_ids_i;
-
-		}
-		std::get<0>(nz_per_column[i]) = umap.size();
-		std::get<2>(nz_per_column[i]) = max_row_number;
-		std::get<1>(nz_per_column[i]) = total_elements;
-
-	} 
-	// parallel programming ended
-	return std::move(nz_per_column);
-
-}
-
-
-
-//..........................................................................//
-
-
-template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM> // NM is number_of_matrices and CPT should include nnz range for the sum ie., should be suffice to be the CPT for sum
-
-void count_sort(pvector<std::pair<RIT, VT> >& all_elements, size_t expon)
-{
-
-
-	size_t num_of_elements = all_elements.size();
-
-	pvector<std::pair<RIT, VT> > temp_array(num_of_elements);
-	size_t count[10] = {0};
-	size_t index_for_count;
-
-	for(size_t i = 0; i < num_of_elements; i++){
-		index_for_count = ((all_elements[i].first)/expon)%10;
-		count[index_for_count]++;
-	}
-
-	for(int i = 1; i < 10; i++){
-		count[i] += count[i-1];
-	}
-
-	for(size_t i = num_of_elements-1; i > 0; i--){
-		index_for_count = ((all_elements[i].first)/expon)%10;
-		temp_array[count[index_for_count] -1] = all_elements[i];
-		count[index_for_count]--;
-	}
-
-
-	index_for_count = ((all_elements[0].first)/expon)%10;
-	temp_array[count[index_for_count] -1] = all_elements[0];
-
-	all_elements = std::move(temp_array);
-
-	return;
-}
-
-
-//..........................................................................//
-
-
-
-template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM> // NM is number_of_matrices and CPT should include nnz range for the sum ie., should be suffice to be the CPT for sum
-
-CSC<RIT, VT, CPT> add_vec_of_matrices_5(std::vector<CSC<RIT, VT, CPT>* > &vec_of_matrices)          //used RADIX SORT here. optimised, used symbolic step to calculate the space needed and so no push_backs
-{	 
-
-
-	assert(vec_of_matrices.size() != 0);
-
-	CIT num_of_columns = vec_of_matrices[0]->get_ncols();
-	RIT num_of_rows = vec_of_matrices[0]->get_nrows();
-
-#pragma omp parallel for
-	for(NM i = 0; i < vec_of_matrices.size(); i++){
-		assert(num_of_columns == vec_of_matrices[i]->get_ncols());
-		assert(num_of_rows == vec_of_matrices[i]->get_nrows());
-	}
-
-	pvector<std::tuple<RIT, size_t, RIT> > nz_per_column = symbolic_add_vec_of_matrices_modified<RIT, CIT, VT, CPT, NM>(vec_of_matrices);  // has nnz in sum pre column, total elements in all matrices per column, max element in all rows in all matrices per column as tuple
-
-	pvector<RIT> nz_per_column_in_sum(num_of_columns);
-
-#pragma omp parallel for
-	for(CIT i = 0; i < num_of_columns; i++){
-		nz_per_column_in_sum[i] = std::get<0>(nz_per_column[i]);
-	} //parallel ended
-
-	pvector<CPT> prefix_sum(num_of_columns+1);
-	// pvector<CPT> column_vector_for_csc(num_of_columns+1);
-	// prefix_sum[0] = 0;
-	// column_vector_for_csc[0] = 0;
-
-	// for(CIT i = 1; i < num_of_columns+1; i++){
-	// 	prefix_sum[i] = prefix_sum[i-1] + std::get<0>(nz_per_column[i-1]);
-	// 	column_vector_for_csc[i] = prefix_sum[i];
-	// }
-	ParallelPrefixSum(nz_per_column_in_sum, prefix_sum);
-	pvector<CPT> column_vector_for_csc(prefix_sum.begin(), prefix_sum.end());
-
-
-	pvector<VT> value_vector_for_csc(prefix_sum[num_of_columns]);
-	pvector<RIT> row_vector_for_csc(prefix_sum[num_of_columns]);
-
-
-#pragma omp parallel for
-	for(CIT i = 0; i < num_of_columns; i++){
-
-		pvector<std::pair<RIT, VT> > all_elements(std::get<1>(nz_per_column[i]) );
-		NM number_of_matrices = vec_of_matrices.size();
-		size_t current_index = 0;
-
-		for(NM k = 0; k < number_of_matrices; k++){
-
-			const pvector<CPT> *col_ptr_i = vec_of_matrices[k]->get_colPtr();
-			const pvector<RIT> *row_ids_i = vec_of_matrices[k]->get_rowIds();
-			const pvector<VT> *nz_i = vec_of_matrices[k]->get_nzVals();
-
-			for(CPT j = (*col_ptr_i)[i]; j < (*col_ptr_i)[i+1]; j++){
-				all_elements[current_index] = std::pair<RIT, VT>((*row_ids_i)[j], (*nz_i)[j]);
-				current_index++;
-			}
-
-			col_ptr_i = nullptr;
-			row_ids_i = nullptr;
-			nz_i = nullptr;
-
-			delete col_ptr_i;
-			delete row_ids_i;
-			delete nz_i;
-		}
-
-
-		RIT max_row_number = std::get<2>(nz_per_column[i]);
-		for(size_t expon = 1; max_row_number/expon > 0; expon *= 10){
-			count_sort<RIT, CIT, VT, CPT, NM>(all_elements, expon);
-		}
-
-
-		size_t num_of_elements = all_elements.size();
-		VT sum = 0;
-		for(size_t j = 0; j < num_of_elements; j++){
-			if(j == 0){
-				value_vector_for_csc[prefix_sum[i]] = all_elements[j].second;
-				row_vector_for_csc[prefix_sum[i]] = all_elements[j].first;
-				prefix_sum[i]++;
-			}else{
-				if(all_elements[j].first == row_vector_for_csc[prefix_sum[i] - 1]){
-					value_vector_for_csc[prefix_sum[i] - 1] += all_elements[j].second;
-				}else{
-					value_vector_for_csc[prefix_sum[i]] = all_elements[j].second;
-					row_vector_for_csc[prefix_sum[i]] = all_elements[j].first;
-					prefix_sum[i]++;
-				}
-			}
-		}
-
-
-	}  // parallel programming ended
-
-
-
-	Timer clock;
-	clock.Start();
-
-	CSC<RIT, VT, CPT> result_matrix_csc(num_of_rows, num_of_columns, column_vector_for_csc[num_of_columns], true, true);
-	result_matrix_csc.nz_rows_pvector(&row_vector_for_csc);
-	result_matrix_csc.cols_pvector(&column_vector_for_csc);
-	result_matrix_csc.nz_vals_pvector(&value_vector_for_csc);
-
-	clock.Stop();
-	//PrintTime("CSC Creation Time", clock.Seconds());
-
-	return std::move(result_matrix_csc);
-
-}
-
-
-
-
-
-//..........................................................................//
-
-
-
-template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM> // NM is number_of_matrices and CPT should include nnz range for the sum ie., should be suffice to be the CPT for sum
-
-CSC<RIT, VT, CPT> add_vec_of_matrices_6(std::vector<CSC<RIT, VT, CPT>* > &vec_of_matrices)          // used long array(in the sense of maintaining a vector of row size for every column) here.optimised, used symbolic step to calculate the space needed and so no push_backs
-{	 
-
-
-	assert(vec_of_matrices.size() != 0);
-
-	CIT num_of_columns = vec_of_matrices[0]->get_ncols();
-	RIT num_of_rows = vec_of_matrices[0]->get_nrows();
-
-#pragma omp parallel for
-	for(NM i = 0; i < vec_of_matrices.size(); i++){
-		assert(num_of_columns == vec_of_matrices[i]->get_ncols());
-		assert(num_of_rows == vec_of_matrices[i]->get_nrows());
-	}
-
-	pvector<RIT> nz_per_column = symbolic_add_vec_of_matrices<RIT, CIT, VT, CPT, NM>(vec_of_matrices); 
-
-	pvector<CPT> prefix_sum(num_of_columns+1);
-	// pvector<CPT> column_vector_for_csc(num_of_columns+1);
-	// prefix_sum[0] = 0;
-	// column_vector_for_csc[0] = 0;
-
-	// for(CIT i = 1; i < num_of_columns+1; i++){
-	// 	prefix_sum[i] = prefix_sum[i-1] + nz_per_column[i-1];
-	// 	column_vector_for_csc[i] = prefix_sum[i];
-	// }
-
-	ParallelPrefixSum(nz_per_column, prefix_sum);
-	pvector<CPT> column_vector_for_csc(prefix_sum.begin(), prefix_sum.end());
-
-
-	pvector<VT> value_vector_for_csc(prefix_sum[num_of_columns]);
-	pvector<RIT> row_vector_for_csc(prefix_sum[num_of_columns]);
-
-
-#pragma omp parallel for
-	for(CIT i = 0; i < num_of_columns; i++){
-
-		pvector<VT> row_size_vector(num_of_rows, 0);
-		pvector<bool> is_occupied(num_of_rows, false);
-		NM number_of_matrices = vec_of_matrices.size();
-
-		for(NM k = 0; k < number_of_matrices; k++){
-
-			const pvector<CPT> *col_ptr_i = vec_of_matrices[k]->get_colPtr();
-			const pvector<RIT> *row_ids_i = vec_of_matrices[k]->get_rowIds();
-			const pvector<VT> *nz_i = vec_of_matrices[k]->get_nzVals();
-
-			for(CPT j = (*col_ptr_i)[i]; j < (*col_ptr_i)[i+1]; j++){
-				row_size_vector[(*row_ids_i)[j] ] += (*nz_i)[j];
-				is_occupied[(*row_ids_i)[j] ] = true;
-			}
-
-			col_ptr_i = nullptr;
-			row_ids_i = nullptr;
-			nz_i = nullptr;
-
-			delete col_ptr_i;
-			delete row_ids_i;
-			delete nz_i;
-		}
-
-		for(RIT j = 0; j < num_of_rows; j++){
-			if(is_occupied[j]){
-				value_vector_for_csc[prefix_sum[i] ] = row_size_vector[j];
-				row_vector_for_csc[prefix_sum[i] ] = j;
-				prefix_sum[i]++;
-			}
-		}
-
-
-	}  // parallel programming ended
-
-
-
-	Timer clock;
-	clock.Start();
-
-	CSC<RIT, VT, CPT> result_matrix_csc(num_of_rows, num_of_columns, column_vector_for_csc[num_of_columns], true, true);
-	result_matrix_csc.nz_rows_pvector(&row_vector_for_csc);
-	result_matrix_csc.cols_pvector(&column_vector_for_csc);
-	result_matrix_csc.nz_vals_pvector(&value_vector_for_csc);
-
-	clock.Stop();
-	//PrintTime("CSC Creation Time", clock.Seconds());
-
-	return std::move(result_matrix_csc);
-
+template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
+CSC<RIT, VT, CPT> SpMultiAddHeapStatic(std::vector<CSC<RIT, VT, CPT>* > &matrices){
+
+    double t0, t1, t2, t3, t4, t5;
+
+    t0 = omp_get_wtime();
+    CIT nthreads;
+    CIT nsplits;
+    size_t nmatrices = matrices.size();
+    CIT ncols = matrices[0]->get_ncols();
+    RIT nrows = matrices[0]->get_nrows();
+    
+    pvector<double> ttimes; // To record time taken by each thread
+    pvector<CPT> splitters; // To store load balance friendly split of columns accross threads;
+
+    pvector<size_t> flopsPerCol(ncols);
+    pvector<RIT> nnzPerCol(ncols, 0);
+
+    t2 = omp_get_wtime();
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        if(tid == 0){
+            nthreads = omp_get_num_threads();
+            nsplits = std::min(nthreads * 4, ncols); // More split for better load balance
+        }
+#pragma omp for
+        for(CPT i = 0; i < ncols; i++){
+            flopsPerCol[i] = 0;
+            for(int k = 0; k < nmatrices; k++){
+                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                flopsPerCol[i] += (*colPtr)[i+1] - (*colPtr)[i];
+            }
+        }
+    }
+    t3 = omp_get_wtime();
+
+    pvector<size_t> prefixSumSymbolic(ncols+1, 0);
+    ParallelPrefixSum(flopsPerCol, prefixSumSymbolic);
+    
+    size_t flopsTot = prefixSumSymbolic[ncols];
+    size_t flopsPerThreadExpected;
+    size_t flopsPerSplitExpected;
+
+    ttimes.resize(nthreads);
+    splitters.resize(nsplits);
+    flopsPerSplitExpected = flopsTot / nsplits;
+    flopsPerThreadExpected = flopsTot / nthreads;
+    
+    t1 = omp_get_wtime();
+    
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        std::vector< std::tuple<RIT, VT, int> > heap(nmatrices);
+        std::vector< CPT > curptr(nmatrices, static_cast<CPT>(0));
+        CPT hsize = 0;
+#pragma omp for schedule(static)
+        for(CIT i = 0; i < ncols; i++){
+            hsize = 0;
+            for(int k = 0; k < nmatrices; k++){
+                curptr[k] = 0;
+                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+
+                RIT j = (*colPtr)[i] + curptr[k];
+                if(j < (*colPtr)[i+1]){
+                    heap[hsize] = std::make_tuple((*rowIds)[j], (*nzVals)[j], k);
+                    hsize++;
+                    curptr[k]++;
+                }
+            }
+
+            std::make_heap(heap.data(), heap.data()+hsize, compare);
+
+            nnzPerCol[i] = 0;
+            RIT lastPoppedRow = -1;
+            while(hsize > 0){
+                std::pop_heap(heap.data(), heap.data()+hsize, compare);
+
+                int k = std::get<2>(heap[hsize-1]);
+                RIT r = std::get<0>(heap[hsize-1]);
+
+                if(r != lastPoppedRow){
+                    nnzPerCol[i]++;
+                    lastPoppedRow = r;
+                }
+
+                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+
+                RIT j = (*colPtr)[i] + curptr[k];
+                if(j < (*colPtr)[i+1]){
+                    heap[hsize-1] = std::make_tuple((*rowIds)[j], (*nzVals)[j], k);
+                    std::push_heap(heap.data(), heap.data()+hsize, compare);
+                    curptr[k]++;
+                }
+                else{
+                    hsize--;
+                }
+            }
+        }
+    }
+
+    pvector<size_t> prefixSum(ncols+1, 0);
+    ParallelPrefixSum(nnzPerCol, prefixSum);
+
+    pvector<CPT> CcolPtr(prefixSum.begin(), prefixSum.end());
+    pvector<RIT> CrowIds(prefixSum[ncols]);
+    pvector<VT> CnzVals(prefixSum[ncols]);
+    CSC<RIT, VT, CPT> sumMat(nrows, ncols, prefixSum[ncols], false, true);
+    sumMat.cols_pvector(&CcolPtr);
+    
+    CPT nnzCTot = prefixSum[ncols];
+    CPT nnzCPerThreadExpected = nnzCTot / nthreads;
+    CPT nnzCPerSplitExpected = nnzCTot / nsplits;
+    
+    pvector<double> colTimes(ncols);
+    
+    t0 = omp_get_wtime();
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        std::vector< std::tuple<RIT, VT, int> > heap(nmatrices);
+        std::vector< CPT > curptr(nmatrices, static_cast<CPT>(0));
+        CPT hsize = 0;
+#pragma omp for schedule(static)
+        for(CIT i = 0; i < ncols; i++){
+            hsize = 0;
+            for(int k = 0; k < nmatrices; k++){
+                curptr[k] = 0;
+                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+
+                RIT j = (*colPtr)[i] + curptr[k];
+                if(j < (*colPtr)[i+1]){
+                    heap[hsize] = std::make_tuple((*rowIds)[j], (*nzVals)[j], k);
+                    hsize++;
+                    curptr[k]++;
+                }
+            }
+
+            std::make_heap(heap.data(), heap.data()+hsize, compare);
+
+            nnzPerCol[i] = 0;
+            RIT lastPoppedRow = -1;
+            CPT idx = -1;
+            while(hsize > 0){
+                std::pop_heap(heap.data(), heap.data()+hsize, compare);
+
+                //for(int x = 0; x < hsize; x++){
+                    //printf("(%d, %d) ", std::get<0>(heap[x]), std::get<2>(heap[x]));
+                //}
+                //printf("\n");
+
+                int k = std::get<2>(heap[hsize-1]);
+                RIT r = std::get<0>(heap[hsize-1]);
+                VT v = std::get<1>(heap[hsize-1]);
+
+                if(r != lastPoppedRow){
+                    lastPoppedRow = r;
+                    CrowIds[prefixSum[i]] = r;
+                    CnzVals[prefixSum[i]] = v;
+                    prefixSum[i]++;
+                }
+                else{
+                    CnzVals[prefixSum[i]-1] += v;
+                }
+
+                const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
+                const pvector<RIT> *rowIds = matrices[k]->get_rowIds();
+                const pvector<VT> *nzVals = matrices[k]->get_nzVals();
+
+                RIT j = (*colPtr)[i] + curptr[k];
+                if(j < (*colPtr)[i+1]){
+                    heap[hsize-1] = std::make_tuple((*rowIds)[j], (*nzVals)[j], k);
+                    std::push_heap(heap.data(), heap.data()+hsize, compare);
+                    curptr[k]++;
+                }
+                else{
+                    hsize--;
+                }
+            }
+        }
+    }
+
+    sumMat.nz_rows_pvector(&CrowIds);
+    sumMat.nz_vals_pvector(&CnzVals);
+    return std::move(sumMat);
 }
 
 #endif

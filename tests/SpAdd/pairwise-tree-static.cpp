@@ -23,28 +23,35 @@ int main(int argc, char* argv[]){
     int type = atoi(argv[5]); // Type of matrix
     int t = atoi(argv[6]); // number of threads
 
-	std::vector< CSC<uint32_t, uint32_t, uint32_t>* > vec;
-    std::vector< CSC<uint32_t, uint32_t, uint32_t>* > vec_temp;
+	std::vector< CSC<uint32_t, float, uint32_t>* > vec;
+    std::vector< CSC<uint32_t, float, uint32_t>* > vec_temp;
 
     uint64_t total_nnz_in = 0;
     uint64_t total_nnz_out = 0;
 
     for(int i = 0; i < k; i++){
-        COO<uint32_t, uint32_t, uint32_t> coo;
+        COO<uint32_t, uint32_t, float> coo;
+        double t0, t1;
         if(type == 0){
             coo.GenER(x, y, d, weighted, i);   // Generate a weighted ER matrix with 2^x rows, 2^y columns and d nonzeros per column using random seed i
         }
-        else{
+        else if(type == 1){
             // For RMAT matrix need to be square. So x need to be equal to y.
             if (x != y){
                 x = std::min(x,y);
             }
             coo.GenRMAT(x, d, weighted, i);   // Generate a weighted RMAT matrix with 2^x rows, 2^x columns and d nonzeros per column using random seed i
         }
+        else if(type == 2){
+            std::string filename(argv[7]);
+            filename = filename + std::to_string(i);
+            t0 = omp_get_wtime();
+            coo.ReadMM(filename);
+            t1 = omp_get_wtime();
+            //printf("Time to read %s: %lf seconds\n", filename.c_str(), t1-t0);
+        }
 
-        vec.push_back(new CSC<uint32_t, uint32_t, uint32_t>(coo));
-        //vec_temp.push_back(new CSC<uint32_t, uint32_t, uint32_t>(coo));
-        //vec[i]->print_all();
+        vec.push_back(new CSC<uint32_t, float, uint32_t>(coo));
         total_nnz_in += vec[vec.size()-1]->get_nnz();
     }
     
@@ -65,14 +72,13 @@ int main(int argc, char* argv[]){
         omp_set_num_threads(t);
         mkl_set_num_threads(t);
 
-        CSC<uint32_t, uint32_t, uint32_t> OutPairwiseLinear;
-        CSC<uint32_t, uint32_t, uint32_t> SpAdd_out;
+        CSC<uint32_t, float, uint32_t> OutPairwiseLinear;
+        CSC<uint32_t, float, uint32_t> SpAdd_out;
         pvector<uint32_t> nnzCPerCol;
 
-        std::vector< CSC<uint32_t, uint32_t, uint32_t>* > tree(vec.begin(), vec.end());
-        //std::vector< CSC<uint32_t, uint32_t, uint32_t>* > tree(vec_temp.begin(), vec_temp.end());
-        CSC<uint32_t, uint32_t, uint32_t> * temp1;
-        CSC<uint32_t, uint32_t, uint32_t> * temp2;
+        std::vector< CSC<uint32_t, float, uint32_t>* > tree(vec.begin(), vec.end());
+        CSC<uint32_t, float, uint32_t> * temp1;
+        CSC<uint32_t, float, uint32_t> * temp2;
         int nIntermediate = tree.size();
         int level = 0;
         double tree_time = 0;
@@ -86,8 +92,8 @@ int main(int argc, char* argv[]){
                     temp1 = tree[idxf];
                     temp2 = tree[idxs];
                     clock.Start();
-                    pvector<uint32_t> nnzCPerCol = symbolicSpAddRegularStatic<uint32_t,uint32_t,uint32_t,uint32_t>(tree[idxf], tree[idxs]);
-                    tree[j] = new CSC<uint32_t, uint32_t, uint32_t>(SpAddRegularStatic<uint32_t,uint32_t,uint32_t,uint32_t>(tree[idxf], tree[idxs], nnzCPerCol));
+                    pvector<uint32_t> nnzCPerCol = symbolicSpAddRegularStatic<uint32_t,uint32_t,float,uint32_t>(tree[idxf], tree[idxs]);
+                    tree[j] = new CSC<uint32_t, float, uint32_t>(SpAddRegularStatic<uint32_t,uint32_t,float,uint32_t>(tree[idxf], tree[idxs], nnzCPerCol));
                     clock.Stop();
                     tree_time += clock.Seconds();
                     delete temp1;
@@ -107,8 +113,11 @@ int main(int argc, char* argv[]){
         if(type == 0){
             std::cout << "ER" << "," ;
         }
-        else{
+        else if(type == 1){
             std::cout << "RMAT" << "," ;
+        }
+        else if(type == 2){
+            std::cout << "Given" << "," ;
         }
         std::cout << x << "," ;
         std::cout << y << "," ;
