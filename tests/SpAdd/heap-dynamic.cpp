@@ -74,17 +74,13 @@ int main(int argc, char* argv[]){
         CSC<uint32_t, float, uint32_t> OutPairwiseLinear;
         CSC<uint32_t, float, uint32_t> SpAdd_out;
         pvector<uint32_t> nnzCPerCol;
-        
-        double hash_time = 0;
+
+        double sliding_time = 0;
         for(int it = 0; it < iterations; it++){
-            clock.Start();
-            nnzCPerCol = symbolicSpMultiAddHashStatic<uint32_t, uint32_t, float, uint32_t, uint32_t>(vec);
+            clock.Start(); 
+            SpAdd_out = SpMultiAddHeapDynamic<uint32_t,uint32_t, float,uint32_t> (vec);
             clock.Stop();
-            hash_time += clock.Seconds();
-            clock.Start();
-            SpAdd_out = SpMultiAddHashStatic<uint32_t,uint32_t, float,uint32_t> (vec, nnzCPerCol, true);
-            clock.Stop();
-            hash_time += clock.Seconds();
+            sliding_time += clock.Seconds();
         }
         if(type == 0){
             std::cout << "ER" << "," ;
@@ -100,11 +96,11 @@ int main(int argc, char* argv[]){
         std::cout << d << "," ;
         std::cout << k << "," ;
         std::cout << t << ",";
-        std::cout << "SpMultiAddHashStatic" << ","; 
-        std::cout << hash_time / iterations << ",";
+        std::cout << "SpMultiAddHeapDynamic" << ","; 
+        std::cout << sliding_time / iterations << ",";
         std::cout << total_nnz_in << ",";
         std::cout << SpAdd_out.get_nnz() << std::endl;
-
+        
     }
 
 	return 0;

@@ -13,6 +13,12 @@
 #include "mkl.h"
 #include "mkl_spblas.h"
 
+#if defined ( MKL_ILP64 )
+#define MKL_INT long long int /* 64 bit integer for large arrays. */
+#else
+#define MKL_INT int /* 32 bit integer for arrays < 2^31-1 elements. */
+#endif
+
 int main(int argc, char* argv[]){
     int x = atoi(argv[1]); // scale of random matrix, indicates number of rows
     int y = atoi(argv[2]); // scale of random matrix, indicates number of columns
@@ -23,35 +29,41 @@ int main(int argc, char* argv[]){
     int type = atoi(argv[5]); // Type of matrix
     int t = atoi(argv[6]); // number of threads
 
-	std::vector< CSC<uint32_t, uint32_t, uint32_t>* > vec;
-    std::vector< CSC<uint32_t, uint32_t, uint32_t>* > vec_temp;
+	std::vector< CSC<uint32_t, float, uint32_t>* > vec;
+    std::vector< CSC<uint32_t, float, uint32_t>* > vec_temp;
 
     uint64_t total_nnz_in = 0;
     uint64_t total_nnz_out = 0;
 
     for(int i = 0; i < k; i++){
-        COO<uint32_t, uint32_t, uint32_t> coo;
+        COO<uint32_t, uint32_t, float> coo;
+        double t0, t1;
         if(type == 0){
             coo.GenER(x, y, d, weighted, i);   // Generate a weighted ER matrix with 2^x rows, 2^y columns and d nonzeros per column using random seed i
         }
-        else{
+        else if(type == 1){
             // For RMAT matrix need to be square. So x need to be equal to y.
             if (x != y){
                 x = std::min(x,y);
             }
             coo.GenRMAT(x, d, weighted, i);   // Generate a weighted RMAT matrix with 2^x rows, 2^x columns and d nonzeros per column using random seed i
         }
+        else if(type == 2){
+            std::string filename(argv[7]);
+            filename = filename + std::to_string(i);
+            t0 = omp_get_wtime();
+            coo.ReadMM(filename);
+            t1 = omp_get_wtime();
+        }
 
-        vec.push_back(new CSC<uint32_t, uint32_t, uint32_t>(coo));
-        //vec_temp.push_back(new CSC<uint32_t, uint32_t, uint32_t>(coo));
-        //vec[i]->print_all();
+        vec.push_back(new CSC<uint32_t, float, uint32_t>(coo));
         total_nnz_in += vec[vec.size()-1]->get_nnz();
     }
     
     Timer clock;
 
     // MKL specific codes
-     
+    
     double** mkl_values = (double**) malloc( k * sizeof(double*) );
     MKL_INT** mkl_rows = (MKL_INT**) malloc( k * sizeof(MKL_INT*) );
     MKL_INT** mkl_pointerB = (MKL_INT**) malloc( k * sizeof(MKL_INT*) );
@@ -60,7 +72,7 @@ int main(int argc, char* argv[]){
     sparse_matrix_t* mkl_csc_matrices = (sparse_matrix_t*) malloc( k * sizeof(sparse_matrix_t) );
     sparse_matrix_t* mkl_csr_matrices = (sparse_matrix_t*) malloc( k * sizeof(sparse_matrix_t) );
     sparse_matrix_t* mkl_sums = (sparse_matrix_t*) malloc( k * sizeof(sparse_matrix_t) );
-
+    
     for(int i = 0; i < k; i++){
         mkl_values[i] = NULL;
         mkl_rows[i] = NULL;
@@ -71,7 +83,6 @@ int main(int argc, char* argv[]){
         mkl_sums[i] = NULL;
     }
 
-//#pragma omp parallel
     for(int i = 0; i < k; i++){
         auto csc_nzVals = vec[i]->get_nzVals(); 
         mkl_values[i] = (double*) malloc( ( csc_nzVals->size() ) * sizeof(double) );
@@ -88,6 +99,7 @@ int main(int argc, char* argv[]){
         auto csc_colPtr = vec[i]->get_colPtr();
         mkl_pointerB[i] = (MKL_INT*) malloc( ( csc_colPtr->size() ) * sizeof(MKL_INT) );
         mkl_pointerE[i] = (MKL_INT*) malloc( ( csc_colPtr->size() ) * sizeof(MKL_INT) );
+
         for(int j = 0; j < csc_colPtr->size(); j++){
             if(j == 0){
                 mkl_pointerB[i][j] = (MKL_INT) (*csc_colPtr)[j];
@@ -122,7 +134,9 @@ int main(int argc, char* argv[]){
             //case SPARSE_STATUS_NOT_SUPPORTED: printf("SPARSE_STATUS_NOT_SUPPORTED"); break;
         //}
         //printf("\n");
+        
 
+        /**/
         //printf("Converting MKL CSC matrix %d to CSR: ", i);
         sparse_status_t conv_status = mkl_sparse_convert_csr (
             mkl_csc_matrices[i],
@@ -139,10 +153,10 @@ int main(int argc, char* argv[]){
             //case SPARSE_STATUS_NOT_SUPPORTED: printf("SPARSE_STATUS_NOT_SUPPORTED"); break;
         //}
         //printf("\n");
+        /**/
     }
     //printf("MKL sparse matrices created\n");
     //printf("\n");
-
 
     //std::vector<int> threads{1, 6, 12, 24, 48};
     //std::vector<int> threads{1, 16, 48};
@@ -263,13 +277,17 @@ int main(int argc, char* argv[]){
         if(type == 0){
             std::cout << "ER" << "," ;
         }
-        else{
+        else if(type == 1){
             std::cout << "RMAT" << "," ;
+        }
+        else if(type == 2){
+            std::cout << "Given" << "," ;
         }
         std::cout << x << "," ;
         std::cout << y << "," ;
+        std::cout << d << "," ;
         std::cout << k << "," ;
-        std::cout << t << ",";
+        std::cout << t << "," ;
         std::cout << "TreeMKL" << ","; 
         std::cout << mkl_time << ",";
         std::cout << total_nnz_in << ",";

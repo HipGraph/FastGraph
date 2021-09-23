@@ -70,6 +70,7 @@ public:
         nrows_ = (size_t)(m);
         ncols_ = (size_t)(n);
         nnz_ = (size_t)(nz);
+        isWeighted_ = true;
 
         nzRows_.resize(nnz_);
         nzCols_.resize(nnz_);
@@ -186,7 +187,7 @@ void COO<RIT, CIT, VT>:: BinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinn
     rowIdsBinned.resize(nnz_);
     if(isWeighted_)
         nzValsBinned.resize(nnz_);
-#pragma omp parallel for
+//#pragma omp parallel for
     for(size_t i=0; i<nnz_; i++)
     {
         size_t pos = fetch_and_add(curPtr[nzCols_[i]], 1);
