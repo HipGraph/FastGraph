@@ -10,9 +10,6 @@
 #include "../../include/CSC_adder.h"
 #include "../../include/utils.h"
 
-#include "mkl.h"
-#include "mkl_spblas.h"
-
 int main(int argc, char* argv[]){
     int x = atoi(argv[1]); // scale of random matrix, indicates number of rows
     int y = atoi(argv[2]); // scale of random matrix, indicates number of columns
@@ -84,7 +81,6 @@ int main(int argc, char* argv[]){
 
     for(int i = 0; i < threads.size(); i++){
         //omp_set_num_threads(threads[i]);
-        //mkl_set_num_threads(threads[i]);
 
         omp_set_num_threads(t);
 
