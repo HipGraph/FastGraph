@@ -3,7 +3,8 @@ MKLROOT = /N/u2/t/taufique/intel/mkl
 SPLIB_ROOT = ../../
 NIST_DIR = $(SPLIB_ROOT)/include/NIST
 
-CC = g++ -fopenmp -fpermissive -std=c++11 -DMKL_ILP64 -m64
+#CC = g++ -fopenmp -fpermissive -std=c++11 -DMKL_ILP64 -m64
+CC = g++ -fopenmp -fpermissive -std=c++11 -DMKL_ILP64 -DBREAKDOWN -m64
 #CC = g++ -fopenmp -fpermissive -std=c++11 -DMKL_ILP64 -m64 -g -Og -mavx # Use this if binary is used with Valgrind
 INC = -I${MKLROOT}/include
 LIB = -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_ilp64.a \
@@ -155,5 +156,5 @@ clean:
 	rm -f mmio.o
 	rm -f comparison.o
 	rm -f comparison
-	rm -f window.o
-	rm -f window
+	#rm -f window.o
+	#rm -f window

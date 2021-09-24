@@ -37,7 +37,6 @@ class CSC
 {
 public:
 	CSC(): nrows_(0), ncols_(0), nnz_(0), isColSorted_(false) {}
-	//COO(nrows, ncols, nnz, isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), sort_type_(UNSORTED), isWeighted_(isWeighted); {NzList.resize(nnz_);}
 
 	CSC(RIT nrows, size_t ncols, size_t nnz,bool col_sort_bool, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), isColSorted_(col_sort_bool), isWeighted_(isWeighted) 
     {
@@ -95,10 +94,8 @@ public:
 	void sort_inside_column();
 
 	void print_all(); // added by abhishek
-
-    template <typename RIT1, typename CIT1, typename VT1, typename CPT1>
-    friend CSC<RIT1, VT1, CPT1> SpAddHash(std::vector<CSC<RIT1, VT1, CPT1>* > & matrices, bool sorted);
-
+    
+    void column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int nsplit);
 private:
 	size_t nrows_;
 	size_t ncols_;
@@ -399,7 +396,32 @@ void CSC<RIT, VT, CPT>::sort_inside_column()
 	}
 }
 
-
+template <typename RIT, typename VT, typename CPT>
+void CSC<RIT, VT, CPT>::column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int nsplits)
+{   
+    vec.resize(nsplits);
+    int ncolsPerSplit = ncols_ / nsplits;
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        int nthreads = omp_get_num_threads();
+#pragma omp for
+        for(int s = 0; s < nsplits; s++){
+            CPT colStart = s * ncolsPerSplit;
+            CPT colEnd = (s < nsplits-1) ? (s + 1) * ncolsPerSplit: ncols_;
+            pvector<CPT> colPtr(colEnd - colStart + 1);
+            for(int i = 0; colStart+i < colEnd + 1; i++){
+                colPtr[i] = colPtr_[colStart + i] - colPtr_[colStart];
+            }
+            pvector<RIT> rowIds(rowIds_.begin() + colPtr_[colStart], rowIds_.begin() + colPtr_[colEnd]);
+            pvector<VT> nzVals(nzVals_.begin() + colPtr_[colStart], nzVals_.begin() + colPtr_[colEnd]);
+            vec[s] = new CSC<RIT, VT, CPT>(nrows_, colEnd - colStart, colPtr_[colEnd] - colPtr_[colStart], false, true);
+            vec[s]->cols_pvector(&colPtr);
+            vec[s]->nz_rows_pvector(&rowIds);
+            vec[s]->nz_vals_pvector(&nzVals);
+        }
+    }
+}
 
 
 #endif

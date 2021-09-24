@@ -65,6 +65,14 @@ int main(int argc, char* argv[]){
         total_nnz_in += vec[i]->get_nnz();
     }
     
+    int window;
+    if(type == 0 || type == 1){
+        window = atoi(argv[7]); // number of threads
+    }
+    else if(type == 2){
+        window = atoi(argv[8]);
+    }
+    
     Timer clock;
 
     //std::vector<int> threads{1, 6, 12, 24, 48};
@@ -79,42 +87,42 @@ int main(int argc, char* argv[]){
         //mkl_set_num_threads(threads[i]);
 
         omp_set_num_threads(t);
-        mkl_set_num_threads(t);
 
         CSC<uint32_t, float, uint32_t> OutPairwiseLinear;
         CSC<uint32_t, float, uint32_t> SpAdd_out;
         pvector<uint32_t> nnzCPerCol;
-        
-        double hash_time = 0;
-        for(int it = 0; it < iterations; it++){
-            clock.Start();
-            nnzCPerCol = symbolicSpMultiAddHashDynamic<uint32_t, uint32_t, float, uint32_t, uint32_t>(vec);
-            clock.Stop();
-            hash_time += clock.Seconds();
-            clock.Start();
-            SpAdd_out = SpMultiAddHashDynamic<uint32_t,uint32_t, float,uint32_t> (vec, nnzCPerCol, true);
-            clock.Stop();
-            hash_time += clock.Seconds();
-        }
-        if(type == 0){
-            std::cout << "ER" << "," ;
-        }
-        else if(type == 1){
-            std::cout << "RMAT" << "," ;
-        }
-        else if(type == 2){
-            std::cout << "Given" << "," ;
-        }
-        std::cout << x << "," ;
-        std::cout << y << "," ;
-        std::cout << d << "," ;
-        std::cout << k << "," ;
-        std::cout << t << ",";
-        std::cout << "SpMultiAddHashDynamic" << ","; 
-        std::cout << hash_time / iterations << ",";
-        std::cout << total_nnz_in << ",";
-        std::cout << SpAdd_out.get_nnz() << std::endl;
 
+        //std::vector<int> windows{128, 256, 512, 1024, 2*1024, 4*1024, 8*1024, 16*1024, 32*1024, 64*1024, 128*1024, 256*1024, 512*1024, 1024*1024, 2*1024*1024, 4*1024*1024};
+        std::vector<int> windows{128};
+        for(int w = 0; w < windows.size(); w++){
+            double sliding_time = 0;
+            for(int it = 0; it < iterations; it++){
+                clock.Start(); 
+                SpAdd_out = SpMultiAddHashSlidingDynamic<uint32_t,uint32_t, float,uint32_t> (vec, window, window, true);
+                clock.Stop();
+                sliding_time += clock.Seconds();
+            }
+            if(type == 0){
+                std::cout << "ER" << "," ;
+            }
+            else if(type == 1){
+                std::cout << "RMAT" << "," ;
+            }
+            else if(type == 2){
+                std::cout << "Given" << "," ;
+            }
+            std::cout << x << "," ;
+            std::cout << y << "," ;
+            std::cout << d << "," ;
+            std::cout << k << "," ;
+            std::cout << t << ",";
+            std::cout << "SpMultiAddHashSlidingDynamic" << ","; 
+            std::cout << window << ",";
+            std::cout << sliding_time / iterations << ",";
+            std::cout << total_nnz_in << ",";
+            std::cout << SpAdd_out.get_nnz() << std::endl;
+        }
+        
     }
 
 	return 0;

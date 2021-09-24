@@ -667,6 +667,10 @@ CSC<RIT, VT, CPT> SpMultiAddHashSlidingDynamic(std::vector<CSC<RIT, VT, CPT>* > 
 
     pvector<size_t> prefixSumWindowSymbolic(ncols+1, 0);
     ParallelPrefixSum(nWindowPerColSymbolic, prefixSumWindowSymbolic);
+#ifdef BREAKDOWN
+    // Print total windows needed for symbolic step
+    printf("%d,", prefixSumWindowSymbolic[ncols]);
+#endif
 
     pvector < std::pair<RIT, RIT> > nnzPerWindowSymbolic(prefixSumWindowSymbolic[ncols]);
     
@@ -869,7 +873,6 @@ CSC<RIT, VT, CPT> SpMultiAddHashSlidingDynamic(std::vector<CSC<RIT, VT, CPT>* > 
         ttimes[tid] = ttime;
     }
     t1 = omp_get_wtime();
-    //printf("%lf,", t1-t0);
 #ifdef DEBUG
     printf("[Sliding Hash]\tTime for symbolic: %lf\n", t1-t0);
     printf("[Sliding Hash]\tStats of time consumed by threads:\n");
@@ -879,6 +882,12 @@ CSC<RIT, VT, CPT> SpMultiAddHashSlidingDynamic(std::vector<CSC<RIT, VT, CPT>* > 
     
     pvector<RIT> prefixSumWindow(ncols+1, 0);
     ParallelPrefixSum(nWindowPerCol, prefixSumWindow);
+#ifdef BREAKDOWN
+    // Print time needed for symbolic step
+    printf("%lf,", t1-t0);
+    // Print total window needed for symbplic step
+    printf("%d,", prefixSumWindow[ncols]);
+#endif
 
     //printf("[Sliding Hash]\tStats of number of windows:\n");
     //getStats<RIT>(nWindowPerCol, true);
@@ -1122,15 +1131,10 @@ CSC<RIT, VT, CPT> SpMultiAddHashSlidingDynamic(std::vector<CSC<RIT, VT, CPT>* > 
 #endif
     //printf("***\n\n");
 
-    //std::string ws = std::to_string(windowSize);
-    //std::string prefix("window-");
-    //std::string filename = prefix + ws;
-    //std::fstream fs;
-    //fs.open (filename, std::fstream::out);
-    //fs << "colid,nnzc,nwindow,time" << std::endl;
-    //for (CPT i = 0; i < ncols; i++){
-        //fs << i << "," << nnzPerCol[i] << "," << nWindowPerCol[i] << "," << colTimes[i] << std::endl;
-    //}
+#ifdef BREAKDOWN
+    // Print time needed for symbolic step
+    printf("%lf,", t1-t0);
+#endif
 
     sumMat.nz_rows_pvector(&CrowIds);
     sumMat.nz_vals_pvector(&CnzVals);

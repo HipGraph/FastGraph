@@ -34,13 +34,23 @@ int main(int argc, char* argv[]){
         double t0, t1;
         if(type == 0){
             coo.GenER(x, y, d, weighted, i);   // Generate a weighted ER matrix with 2^x rows, 2^y columns and d nonzeros per column using random seed i
+            vec.push_back(new CSC<uint32_t, float, uint32_t>(coo));
         }
         else if(type == 1){
             // For RMAT matrix need to be square. So x need to be equal to y.
             if (x != y){
-                x = std::min(x,y);
+                int z = std::min(x,y);
+                x = std::max(x,y);
+                if(i == 0){
+                    coo.GenRMAT(x, d, weighted, i);   // Generate a weighted RMAT matrix with 2^x rows, 2^x columns and d nonzeros per column using random seed i
+                    CSC<uint32_t, float, uint32_t> m = CSC<uint32_t, float, uint32_t>(coo);
+                    m.column_split(vec, k);
+                }
             }
-            coo.GenRMAT(x, d, weighted, i);   // Generate a weighted RMAT matrix with 2^x rows, 2^x columns and d nonzeros per column using random seed i
+            else{
+                coo.GenRMAT(x, d, weighted, i);   // Generate a weighted RMAT matrix with 2^x rows, 2^x columns and d nonzeros per column using random seed i
+                vec.push_back(new CSC<uint32_t, float, uint32_t>(coo));
+            }
         }
         else if(type == 2){
             std::string filename(argv[7]);
@@ -48,11 +58,11 @@ int main(int argc, char* argv[]){
             t0 = omp_get_wtime();
             coo.ReadMM(filename);
             t1 = omp_get_wtime();
+            vec.push_back(new CSC<uint32_t, float, uint32_t>(coo));
             //printf("Time to read %s: %lf seconds\n", filename.c_str(), t1-t0);
         }
 
-        vec.push_back(new CSC<uint32_t, float, uint32_t>(coo));
-        total_nnz_in += vec[vec.size()-1]->get_nnz();
+        total_nnz_in += vec[i]->get_nnz();
     }
     
     Timer clock;
