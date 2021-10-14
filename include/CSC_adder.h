@@ -1689,7 +1689,9 @@ CSC<RIT, VT, CPT> SpMultiAddSpADynamic(std::vector<CSC<RIT, VT, CPT>* > & matric
 #pragma omp parallel
     {
         double ttime = omp_get_wtime();
-        std::vector< RIT > globalHashVec(nrows);
+        std::vector< RIT > globalHashVec(nrows, -1);
+        std::vector< RIT > usedPos(nrows, -1);
+        RIT usedPosIdx = 0;
         int tid = omp_get_thread_num();
         if(tid == 0){
             nthreads = omp_get_num_threads();
@@ -1710,7 +1712,6 @@ CSC<RIT, VT, CPT> SpMultiAddSpADynamic(std::vector<CSC<RIT, VT, CPT>* > & matric
             CIT colEnd = (s < nsplits-1) ? splitters[s+1] : ncols;
             for(CIT i = colStart; i < colEnd; i++){
                 nnzPerCol[i] = 0;
-                for(size_t j=0; j < nrows; ++j) globalHashVec[j] = -1;
             
                 for(int k = 0; k < nmatrices; k++){
                     const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
@@ -1723,9 +1724,17 @@ CSC<RIT, VT, CPT> SpMultiAddSpADynamic(std::vector<CSC<RIT, VT, CPT>* > & matric
                         if (globalHashVec[key] == -1) {
                             globalHashVec[key] = key;
                             nnzPerCol[i]++;
+                            usedPos[usedPosIdx] = key;
+                            usedPosIdx++;
                         }
                     }
                 }
+
+                // Re-initialize the hash table for next iteration
+                for(size_t j=0; j < usedPosIdx; j++){
+                    globalHashVec[usedPos[j]] = -1;
+                }
+                usedPosIdx=0;
             }
         }
         ttime = omp_get_wtime() - ttime;
@@ -1752,6 +1761,9 @@ CSC<RIT, VT, CPT> SpMultiAddSpADynamic(std::vector<CSC<RIT, VT, CPT>* > & matric
         double ttime = omp_get_wtime();
         int tid = omp_get_thread_num();
         std::vector< std::pair<RIT,VT>> globalHashVec(nrows);
+        for(size_t j=0; j < nrows; ++j) globalHashVec[j].first = -1;
+        std::vector< RIT > usedPos(nrows, -1);
+        RIT usedPosIdx = 0;
 #pragma omp barrier
 #pragma omp for
         for (size_t s = 0; s < nsplits; s++){
@@ -1763,8 +1775,6 @@ CSC<RIT, VT, CPT> SpMultiAddSpADynamic(std::vector<CSC<RIT, VT, CPT>* > & matric
             CPT colEnd = s < nsplits-1 ? splitters[s+1] : ncols;
             for(CPT i = colStart; i < colEnd; i++){
                 if(nnzPerCol[i] != 0){
-                    for(size_t j=0; j < nrows; ++j) globalHashVec[j].first = -1;
-                
                     for(int k = 0; k < nmatrices; k++)
                     {
                         const pvector<CPT> *colPtr = matrices[k]->get_colPtr();
@@ -1783,17 +1793,21 @@ CSC<RIT, VT, CPT> SpMultiAddSpADynamic(std::vector<CSC<RIT, VT, CPT>* > & matric
                             {
                                 globalHashVec[key].first = key;
                                 globalHashVec[key].second = curval;
+                                usedPos[usedPosIdx] = key;
+                                usedPosIdx++;
                             }
                         }
                     }
+                    
+                    integerSort(usedPos.data(), usedPosIdx);
                
-                    for (size_t j=0; j < nrows; ++j){
-                        if (globalHashVec[j].first != -1){
-                            CrowIds[prefix_sum[i]] = globalHashVec[j].first;
-                            CnzVals[prefix_sum[i]] = globalHashVec[j].second;
-                            prefix_sum[i]++;
-                        }
+                    for (size_t j=0; j < usedPosIdx; ++j){
+                        CrowIds[prefix_sum[i]] = globalHashVec[usedPos[j]].first;
+                        CnzVals[prefix_sum[i]] = globalHashVec[usedPos[j]].second;
+                        prefix_sum[i]++;
+                        globalHashVec[usedPos[j]].first = -1; // Re-initializing the hash table for next iteration
                     }
+                    usedPosIdx=0; // Re-initializing the used array position for next iteration
                 }
             }
         }  // parallel programming ended
