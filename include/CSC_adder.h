@@ -5,7 +5,7 @@
 #include "GAP/pvector.h"
 #include "GAP/timer.h"
 #include "utils.h"
-#include "radixSort.h"
+#include "PBBS/radixSort.h"
 
 #include <vector> // needed while taking input
 #include <unordered_map>
@@ -35,6 +35,7 @@ NM is type for number_of_matrices to merge
 Note: ParallelPrefixSum from utils.h is used in here
 
 */
+
 
 //..........................................................................//
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM>
@@ -248,8 +249,6 @@ pvector<RIT> symbolicSpMultiAddHashStatic(std::vector<CSC<RIT, VT, CPT>* > &vec_
     
 }
 
-
-//..........................................................................//
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t>
 CSC<RIT, VT, CPT> SpMultiAddHashDynamic(std::vector<CSC<RIT, VT, CPT>* > & matrices, pvector<RIT> & nnzPerCol, bool sorted=true)
 {
@@ -586,26 +585,6 @@ CSC<RIT, VT, CPT> SpMultiAddHashStatic(std::vector<CSC<RIT, VT, CPT>* > & matric
 
     sumMat.nz_rows_pvector(&CrowIds);
     sumMat.nz_vals_pvector(&CnzVals);
-
-    //double denseTime = 0;
-    //CPT denseCount = 0;
-    //for (CPT i = 0; i < ncols; i++){
-        //if(nnzPerCol[i] > densityThreshold){
-            //denseTime += colTimes[i];
-            //denseCount += 1;
-        //}
-    //}
-
-    //double sparseTime = 0;
-    //CPT sparseCount = 0;
-    //for (CPT i = 0; i < ncols; i++){
-        //if(nnzPerCol[i] <= densityThreshold){
-            //sparseTime += colTimes[i];
-            //sparseCount += 1;
-        //}
-    //}
-    
-    //std::cout << denseCount << "," << denseTime << "," << sparseCount << "," << sparseTime << ",";
 
     clock.Stop();
     return std::move(sumMat);
@@ -2516,20 +2495,11 @@ CSC<RIT, VT, CPT> SpMultiAddHeapDynamic(std::vector<CSC<RIT, VT, CPT>* > &matric
                 }
 
                 std::make_heap(heap.data(), heap.data()+hsize, compare);
-                //for(int x = 0; x < hsize; x++){
-                    //printf("(%d, %d) ", std::get<0>(heap[x]), std::get<2>(heap[x]));
-                //}
-                //printf("\n");
 
                 nnzPerCol[i] = 0;
                 RIT lastPoppedRow = -1;
                 while(hsize > 0){
                     std::pop_heap(heap.data(), heap.data()+hsize, compare);
-
-                    //for(int x = 0; x < hsize; x++){
-                        //printf("(%d, %d) ", std::get<0>(heap[x]), std::get<2>(heap[x]));
-                    //}
-                    //printf("\n");
 
                     int k = std::get<2>(heap[hsize-1]);
                     RIT r = std::get<0>(heap[hsize-1]);
@@ -2611,11 +2581,6 @@ CSC<RIT, VT, CPT> SpMultiAddHeapDynamic(std::vector<CSC<RIT, VT, CPT>* > &matric
                 CPT idx = -1;
                 while(hsize > 0){
                     std::pop_heap(heap.data(), heap.data()+hsize, compare);
-
-                    //for(int x = 0; x < hsize; x++){
-                        //printf("(%d, %d) ", std::get<0>(heap[x]), std::get<2>(heap[x]));
-                    //}
-                    //printf("\n");
 
                     int k = std::get<2>(heap[hsize-1]);
                     RIT r = std::get<0>(heap[hsize-1]);
@@ -2808,11 +2773,6 @@ CSC<RIT, VT, CPT> SpMultiAddHeapStatic(std::vector<CSC<RIT, VT, CPT>* > &matrice
             while(hsize > 0){
                 std::pop_heap(heap.data(), heap.data()+hsize, compare);
 
-                //for(int x = 0; x < hsize; x++){
-                    //printf("(%d, %d) ", std::get<0>(heap[x]), std::get<2>(heap[x]));
-                //}
-                //printf("\n");
-
                 int k = std::get<2>(heap[hsize-1]);
                 RIT r = std::get<0>(heap[hsize-1]);
                 VT v = std::get<1>(heap[hsize-1]);
@@ -2849,4 +2809,4 @@ CSC<RIT, VT, CPT> SpMultiAddHeapStatic(std::vector<CSC<RIT, VT, CPT>* > &matrice
     return std::move(sumMat);
 }
 
-#endif
+#indif

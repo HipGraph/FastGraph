@@ -3,14 +3,16 @@
 export OMP_NUM_THREADS=48
 export OMP_PLACES=cores
 
-#for ALG in hash-regular-static hash-sliding-static pairwise-tree-static pairwise-serial-static
-for ALG in hash-regular-dynamic hash-sliding-dynamic pairwise-tree-dynamic pairwise-serial-dynamic heap-dynamic spa-dynamic mkl-tree mkl-serial
+#for ALG in hash-regular-dynamic hash-sliding-dynamic pairwise-tree-dynamic pairwise-serial-dynamic heap-dynamic spa-dynamic mkl-tree mkl-serial
+for ALG in spa-dynamic
 do
     FILE="er.${ALG}.csv"
-    echo "matrix,row-scale,col-scale,d,k,thread,algorithm,total,nnz-in,nnz-out" > $FILE
-    for RSCALE in 20 22
+    #echo "matrix,row-scale,col-scale,d,k,thread,algorithm,total,nnz-in,nnz-out" > $FILE
+    #for RSCALE in 20 22
+    for RSCALE in 22
     do
-        for CSCALE in 8 10
+        #for CSCALE in 8 10
+        for CSCALE in 10
         do
             for K in 4 8 16 32 64 128
             do

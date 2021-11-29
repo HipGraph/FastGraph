@@ -18,12 +18,6 @@ mmio.o: $(NIST_DIR)/mmio.c
 mmio.o: $(NIST_DIR)/mmio.c
 	$(CC) -I$(NIST_DIR) -c -o mmio.o $(NIST_DIR)/mmio.c
 
-exp_scaling.o: exp_scaling.cpp
-	$(CC) -I${MKLROOT}/include -c $< -o $@
-
-exp_scaling: exp_scaling.o mmio.o
-	$(CC) $^ -o $@ $(LIB)
-
 hash-regular-static.o: hash-regular-static.cpp
 	$(CC) -I${MKLROOT}/include -c $< -o $@
 
@@ -108,19 +102,11 @@ mkl-tree.o: mkl-tree.cpp
 mkl-tree: mkl-tree.o mmio.o
 	$(CC) $^ -o $@ $(LIB)
 
-comparison.o: comparison.cpp
-	$(CC) -I${MKLROOT}/include -c -o comparison.o comparison.cpp
-
-comparison: comparison.o mmio.o
-	$(CC) -o comparison comparison.o mmio.o
-
 window.o: window.cpp
-	$(CC) -I${MKLROOT}/include -c -o window.o window.cpp
-
-window: window.o mmio.o
+	$(CC) -I${MKLROOT}/include -c -o window.o window: window.o mmio.o
 	$(CC) -o window window.o mmio.o
 
-all: exp_scaling window comparison hash-regular-static hash-regular-dynamic hash-sliding-static hash-sliding-dynamic pairwise-serial-static pairwise-serial-dynamic pairwise-tree-static pairwise-tree-dynamic mkl-serial mkl-tree spa-static spa-dynamic heap-dynamic heap-static
+all: window hash-regular-static hash-regular-dynamic hash-sliding-static hash-sliding-dynamic pairwise-serial-static pairwise-serial-dynamic pairwise-tree-static pairwise-tree-dynamic mkl-serial mkl-tree spa-static spa-dynamic heap-dynamic heap-static
 
 clean:
 	rm -f exp_scaling.o 
@@ -156,5 +142,5 @@ clean:
 	rm -f mmio.o
 	rm -f comparison.o
 	rm -f comparison
-	#rm -f window.o
-	#rm -f window
+	rm -f window.o
+	rm -f window

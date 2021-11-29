@@ -9,10 +9,10 @@ K=128
 FILE="er-scaling.csv"
 #echo "matrix,row-scale,col-scale,d,k,thread,algorithm,total,nnz-in,nnz-out" > $FILE
 
-#for ALG in hash-regular-static hash-sliding-static pairwise-tree-static pairwise-serial-static mkl-serial mkl-tree
-for ALG in heap-static spa-static
+#for ALG in hash-regular-dynamic hash-sliding-dynamic pairwise-tree-dynamic pairwise-serial-dynamic heap-dynamic spa-dynamic mkl-tree mkl-serial
+for ALG in spa-dynamic
 do
-    for D in 1024 16 2048
+    for D in 1024 16 2048 8192
     do
         for T in 48 24 12 1
         do
