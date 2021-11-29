@@ -26,7 +26,7 @@
 #include <iostream>
 #include <algorithm>
 #include <math.h>
-#include "combblas_utils.h"
+#include "utils.h"
 
 
 
