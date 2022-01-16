@@ -5,6 +5,7 @@
 #include <cinttypes>
 #include <string>
 #include <cmath>
+#include <tuple>
 #include "GAP/pvector.h"
 
 #define  EPSILON  0.001

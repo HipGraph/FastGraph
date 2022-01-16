@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cinttypes>
 #include <random>
+#include "omp.h"
 #include "defs.h"
 #include "utils.h"
 #include "GAP/timer.h"
