@@ -2809,4 +2809,4 @@ CSC<RIT, VT, CPT> SpMultiAddHeapStatic(std::vector<CSC<RIT, VT, CPT>* > &matrice
     return std::move(sumMat);
 }
 
-#indif
+#endif

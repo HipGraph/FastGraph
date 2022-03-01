@@ -95,6 +95,17 @@ public:
 
 	void print_all(); // added by abhishek
     
+	
+	void ewiseApply(VT scalar);
+
+	template <typename T>
+	void deemApply(pvector<T> mul_vector);
+
+	template <typename T>
+	void column_reduce(pvector<T> mul_vector);
+
+
+
     void column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int nsplit);
 private:
 	size_t nrows_;
@@ -107,6 +118,89 @@ private:
 	bool isWeighted_;
 	bool isColSorted_;
 };
+
+template <typename RIT, typename VT, typename CPT>
+void CSC<RIT, VT, CPT>::ewiseApply(VT scalar)
+{
+	std::cout<<"Scalar"<<scalar<<std::endl;
+	std::cout<<"\n"<<std::endl;
+	std::cout<<"Rows, columns and non zero values"<<std::endl;
+	std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
+
+
+	for(size_t i = 0; i < nzVals_.size(); i++){
+		nzVals_[i]=nzVals_[i]*scalar;
+		
+	}
+
+	std::cout<<"Nonzero values"<<std::endl;
+	for(size_t i = 0; i < nzVals_.size(); i++){
+		std::cout<<nzVals_[i];
+		if(i != nnz_-1){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+
+}
+
+template <typename RIT, typename VT, typename CPT>
+template<typename T>
+void CSC<RIT, VT, CPT>::deemApply(pvector<T> mul_vector)
+{
+	//int t_count=0;
+
+	for(size_t i = 0; i < colPtr_.size(); i++){
+		//std::cout<<colPtr_[i];
+		colPtr_[i]=colPtr_[i]*mul_vector[i];
+		//t_count++;
+		if(i != ncols_){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+
+	for(size_t i = 0; i < colPtr_.size(); i++){
+		std::cout<<colPtr_[i];
+		//t_count++;
+		if(i != ncols_){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+	std::cout<<"Tcount_"<<std::endl;
+	//std::cout<<t_count;
+}
+
+template <typename RIT, typename VT, typename CPT>
+template<typename T>
+void CSC<RIT, VT, CPT>::column_reduce(pvector<T> mul_vector)
+{
+	for(size_t i = 0; i < colPtr_.size(); i++){
+		//std::cout<<colPtr_[i];
+		mul_vector[i]=colPtr_[i]*mul_vector[i];
+		//t_count++;
+		if(i != ncols_){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+
+	for(size_t i = 0; i < colPtr_.size(); i++){
+		std::cout<<colPtr_[i];
+		//t_count++;
+		if(i != ncols_){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+	std::cout<<"Tcount_"<<std::endl;
+}
 
 template <typename RIT, typename VT, typename CPT>
 const pvector<CPT>* CSC<RIT, VT, CPT>::get_colPtr()

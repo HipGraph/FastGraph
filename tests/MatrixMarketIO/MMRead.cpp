@@ -19,7 +19,15 @@ int main(int argc, char* argv[]){
     CSC<uint32_t, float, uint32_t> csc(coo);
 
     csc.PrintInfo();
+    std::cout<<"ewise"<<std::endl;
+    csc.ewiseApply(2);
 
+    std::cout<<"deemapply"<<std::endl;
+    size_t n=csc.get_ncols();
+    pvector vect(n,1);
+    csc.deemApply(vect);
+    csc.column_reduce(vect);
+    //csc.deemApply(vect);
 	return 0;
 
 }
