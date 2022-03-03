@@ -20,7 +20,7 @@ int main(int argc, char* argv[]){
 
     csc.PrintInfo();
     std::cout<<"ewise"<<std::endl;
-    csc.ewiseApply(2);
+    //csc.ewiseApply(2);
 
     std::cout<<"deemapply here"<<std::endl;
     size_t n=csc.get_ncols();
@@ -29,7 +29,7 @@ int main(int argc, char* argv[]){
     //pvector<int32_t> column_vector(n+1);
     
     //csc.dimApply(column_vector);
-    //csc.column_reduce(vect);
+    csc.column_reduce(column_vector);
     //csc.deemApply(vect);
 	return 0;
 

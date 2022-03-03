@@ -224,6 +224,10 @@ void CSC<RIT, VT, CPT>::column_reduce(std::vector<T> mul_vector)
 			result_vector[i]=result_vector[i]+nzVals_[j]*mul_vector[i+j];
 		}
 	}
+	for(size_t i = 0; i < colPtr_.size(); i++)
+	{
+		std::cout<<result_vector[i]<<std::endl;
+	}
 }
 
 template <typename RIT, typename VT, typename CPT>
