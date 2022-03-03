@@ -22,11 +22,14 @@ int main(int argc, char* argv[]){
     std::cout<<"ewise"<<std::endl;
     csc.ewiseApply(2);
 
-    std::cout<<"deemapply"<<std::endl;
+    std::cout<<"deemapply here"<<std::endl;
     size_t n=csc.get_ncols();
-    pvector vect(n,1);
-    csc.deemApply(vect);
-    csc.column_reduce(vect);
+    std::vector<int> column_vector(n, 2);
+    //pvector vect(n,1);
+    //pvector<int32_t> column_vector(n+1);
+    
+    //csc.dimApply(column_vector);
+    //csc.column_reduce(vect);
     //csc.deemApply(vect);
 	return 0;
 
