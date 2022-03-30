@@ -19,18 +19,17 @@ int main(int argc, char* argv[]){
     CSC<uint32_t, float, uint32_t> csc(coo);
 
     csc.PrintInfo();
-    std::cout<<"ewise"<<std::endl;
+    //std::cout<<"ewise"<<std::endl;
     //csc.ewiseApply(2);
-
-    std::cout<<"deemapply here"<<std::endl;
+    std::cout<<"DimApply here"<<std::endl;
     size_t n=csc.get_ncols();
     std::vector<int> column_vector(n, 2);
     //pvector vect(n,1);
     //pvector<int32_t> column_vector(n+1);
     
-    //csc.dimApply(column_vector);
-    csc.column_reduce(column_vector);
-    //csc.deemApply(vect);
+    csc.dimApply(column_vector);
+    std::cout<<"Column reduce here "<<std::endl;
+    csc.column_reduce();
 	return 0;
 
 }

@@ -105,8 +105,8 @@ public:
 	template <typename T>
 	void dimApply(std::vector<T> mul_vector);
 
-	template <typename T>
-	void column_reduce(std::vector<T> mul_vector);
+	//template <typename T>
+	void column_reduce();
 
 
 
@@ -149,18 +149,6 @@ void CSC<RIT, VT, CPT>::ewiseApply(VT scalar)
 
 }
 
-// template <typename RIT, typename VT, typename CPT>
-// void CSC<RIT, VT, CPT>::ewiseApply1(VT scalar)
-// {
-// 	for(size_t i = 0; i < colPtr_.size(); i++)
-// 	{
-// 		for(size_t j=colPtr_[i];j<colPtr_[i+1];j++)
-// 		{
-// 			nzVals_[j]=nzVals_[j]*scalar;
-// 		}
-// 	}
-
-// }
 
 template <typename RIT, typename VT, typename CPT>
 template<typename T>
@@ -168,9 +156,10 @@ void CSC<RIT, VT, CPT>::dimApply(std::vector<T> mul_vector)
 {
 	for(size_t i = 0; i < colPtr_.size(); i++)
 	{
+		
 		for(size_t j=colPtr_[i];j<colPtr_[i+1];j++)
 		{
-			nzVals_[j]=nzVals_[j]*mul_vector[i+j];
+			nzVals_[j]=nzVals_[j]*mul_vector[i];
 		}
 	}
 	std::cout<<"Nonzero values"<<std::endl;
@@ -182,48 +171,30 @@ void CSC<RIT, VT, CPT>::dimApply(std::vector<T> mul_vector)
 			std::cout<<std::endl;
 		}
 	}
-
-	//int t_count=0;
-
-	// for(size_t i = 0; i < colPtr_.size(); i++){
-	// 	//std::cout<<colPtr_[i];
-	// 	colPtr_[i]=colPtr_[i]*mul_vector[i];
-	// 	//t_count++;
-	// 	if(i != ncols_){
-	// 		std::cout<<" ";
-	// 	}else{
-	// 		std::cout<<std::endl;
-	// 	}
-	// }
-
-	// for(size_t i = 0; i < colPtr_.size(); i++){
-	// 	std::cout<<colPtr_[i];
-	// 	//t_count++;
-	// 	if(i != ncols_){
-	// 		std::cout<<" ";
-	// 	}else{
-	// 		std::cout<<std::endl;
-	// 	}
-	// }
-	// std::cout<<"Tcount_"<<std::endl;
-	// //std::cout<<t_count;
+	
 }
 
 template <typename RIT, typename VT, typename CPT>
-template<typename T>
-void CSC<RIT, VT, CPT>::column_reduce(std::vector<T> mul_vector)
+void CSC<RIT, VT, CPT>::column_reduce()
 {
 	size_t n=get_ncols();
 	pvector<int32_t> result_vector(n+1);
 	for(size_t i = 0; i < colPtr_.size(); i++)
 	{
 		result_vector[i]=0;
+	}
+	for(size_t i = 0; i < colPtr_.size(); i++)
+	{
+		//std::cout<<"ith position "<<i<<std::endl;
+		//result_vector[i]=0;
 		for(size_t j=colPtr_[i];j<colPtr_[i+1];j++)
 		{
-			//nzVals_[j]=nzVals_[j]*mul_vector[i+j];
-			result_vector[i]=result_vector[i]+nzVals_[j]*mul_vector[i+j];
+			//std::cout<<"value here"<<nzVals_[j]<<std::endl;
+			result_vector[i]=result_vector[i]+nzVals_[j];
+			//std::cout<<result_vector[i]<<std::endl;
 		}
 	}
+	std::cout<<"Final Result"<<std::endl;
 	for(size_t i = 0; i < colPtr_.size(); i++)
 	{
 		std::cout<<result_vector[i]<<std::endl;
