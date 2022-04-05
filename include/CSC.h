@@ -102,8 +102,11 @@ public:
 	//void ewiseApply1(VT scalar);
 
 
+	// template <typename T>
+	// void dimApply(std::vector<T> mul_vector);
+
 	template <typename T>
-	void dimApply(std::vector<T> mul_vector);
+	void dimApply(pvector<T> &mul_vector);
 
 	//template <typename T>
 	void column_reduce();
@@ -150,9 +153,34 @@ void CSC<RIT, VT, CPT>::ewiseApply(VT scalar)
 }
 
 
+// template <typename RIT, typename VT, typename CPT>
+// template<typename T>
+// void CSC<RIT, VT, CPT>::dimApply(std::vector<T> mul_vector)
+// {
+// 	for(size_t i = 0; i < colPtr_.size(); i++)
+// 	{
+		
+// 		for(size_t j=colPtr_[i];j<colPtr_[i+1];j++)
+// 		{
+// 			nzVals_[j]=nzVals_[j]*mul_vector[i];
+// 		}
+// 	}
+// 	std::cout<<"Nonzero values"<<std::endl;
+// 	for(size_t i = 0; i < nzVals_.size(); i++){
+// 		std::cout<<nzVals_[i];
+// 		if(i != nnz_-1){
+// 			std::cout<<" ";
+// 		}else{
+// 			std::cout<<std::endl;
+// 		}
+// 	}
+	
+// }
+
+
 template <typename RIT, typename VT, typename CPT>
 template<typename T>
-void CSC<RIT, VT, CPT>::dimApply(std::vector<T> mul_vector)
+void CSC<RIT, VT, CPT>::dimApply(pvector<T> &mul_vector)
 {
 	for(size_t i = 0; i < colPtr_.size(); i++)
 	{
@@ -173,6 +201,11 @@ void CSC<RIT, VT, CPT>::dimApply(std::vector<T> mul_vector)
 	}
 	
 }
+
+
+
+
+
 
 template <typename RIT, typename VT, typename CPT>
 void CSC<RIT, VT, CPT>::column_reduce()

@@ -21,13 +21,24 @@ int main(int argc, char* argv[]){
     csc.PrintInfo();
     //std::cout<<"ewise"<<std::endl;
     //csc.ewiseApply(2);
-    std::cout<<"DimApply here"<<std::endl;
+    std::cout<<"DimApply1 here"<<std::endl;
     size_t n=csc.get_ncols();
     std::vector<int> column_vector(n, 2);
     //pvector vect(n,1);
-    //pvector<int32_t> column_vector(n+1);
+    pvector<float> column_vector_1(n);
+    //pvector<float> column_vector_1(n);
     
-    csc.dimApply(column_vector);
+    for(int j = 0; j < n; j++)
+    {
+		column_vector_1[j]=2;
+	}
+    csc.dimApply(column_vector_1);
+
+    //pvector
+
+    //csc.dimApply(column_vector);
+    //csc.dimApply1(column_vector_1);
+    //csc.dimApply1(column_vector_1);
     std::cout<<"Column reduce here "<<std::endl;
     csc.column_reduce();
 	return 0;
