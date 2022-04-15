@@ -17,6 +17,8 @@ int main(int argc, char* argv[]){
     COO<uint32_t, uint32_t, float> coo;
     coo.ReadMM(filename);
     CSC<uint32_t, float, uint32_t> csc(coo);
+    CSC<uint32_t, float, uint32_t> csc1(coo);
+
 
     csc.PrintInfo();
     //std::cout<<"ewise"<<std::endl;
@@ -27,6 +29,9 @@ int main(int argc, char* argv[]){
     //pvector vect(n,1);
     pvector<float> column_vector_1(n);
     //pvector<float> column_vector_1(n);
+
+    pvector<float> column_reduce_vector(n);
+    // pvector<float> column_reduce_vector(n);
     
     for(int j = 0; j < n; j++)
     {
@@ -41,6 +46,9 @@ int main(int argc, char* argv[]){
     //csc.dimApply1(column_vector_1);
     std::cout<<"Column reduce here "<<std::endl;
     csc.column_reduce();
+    csc.matAddition(csc1);
+    //column_reduce_vector=csc.column_reduce_1();
+    //column_reduce_vector=csc.column_reduce_1();
 	return 0;
 
 }

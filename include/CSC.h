@@ -111,6 +111,11 @@ public:
 	//template <typename T>
 	void column_reduce();
 
+	template <typename T>
+	pvector<T> column_reduce_1();
+
+	
+	void matAddition(CSC &b);
 
 
     void column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int nsplit);
@@ -153,31 +158,6 @@ void CSC<RIT, VT, CPT>::ewiseApply(VT scalar)
 }
 
 
-// template <typename RIT, typename VT, typename CPT>
-// template<typename T>
-// void CSC<RIT, VT, CPT>::dimApply(std::vector<T> mul_vector)
-// {
-// 	for(size_t i = 0; i < colPtr_.size(); i++)
-// 	{
-		
-// 		for(size_t j=colPtr_[i];j<colPtr_[i+1];j++)
-// 		{
-// 			nzVals_[j]=nzVals_[j]*mul_vector[i];
-// 		}
-// 	}
-// 	std::cout<<"Nonzero values"<<std::endl;
-// 	for(size_t i = 0; i < nzVals_.size(); i++){
-// 		std::cout<<nzVals_[i];
-// 		if(i != nnz_-1){
-// 			std::cout<<" ";
-// 		}else{
-// 			std::cout<<std::endl;
-// 		}
-// 	}
-	
-// }
-
-
 template <typename RIT, typename VT, typename CPT>
 template<typename T>
 void CSC<RIT, VT, CPT>::dimApply(pvector<T> &mul_vector)
@@ -218,13 +198,10 @@ void CSC<RIT, VT, CPT>::column_reduce()
 	}
 	for(size_t i = 0; i < colPtr_.size(); i++)
 	{
-		//std::cout<<"ith position "<<i<<std::endl;
-		//result_vector[i]=0;
+		
 		for(size_t j=colPtr_[i];j<colPtr_[i+1];j++)
 		{
-			//std::cout<<"value here"<<nzVals_[j]<<std::endl;
 			result_vector[i]=result_vector[i]+nzVals_[j];
-			//std::cout<<result_vector[i]<<std::endl;
 		}
 	}
 	std::cout<<"Final Result"<<std::endl;
@@ -232,6 +209,130 @@ void CSC<RIT, VT, CPT>::column_reduce()
 	{
 		std::cout<<result_vector[i]<<std::endl;
 	}
+}
+
+template <typename RIT, typename VT, typename CPT>
+template<typename T>
+pvector<T> CSC<RIT, VT, CPT>::column_reduce_1()
+{
+	size_t n=get_ncols();
+	pvector<T> result_vector(n+1);
+	for(size_t i = 0; i < colPtr_.size(); i++)
+	{
+		result_vector[i]=0;
+	}
+	for(size_t i = 0; i < colPtr_.size(); i++)
+	{
+		
+		for(size_t j=colPtr_[i];j<colPtr_[i+1];j++)
+		{
+			result_vector[i]=result_vector[i]+nzVals_[j];
+		}
+	}
+	std::cout<<"Final Result"<<std::endl;
+	// for(size_t i = 0; i < colPtr_.size(); i++)
+	// {
+	// 	std::cout<<result_vector[i]<<std::endl;
+	// }
+	return result_vector;
+}
+
+template <typename RIT, typename VT, typename CPT>
+void CSC<RIT, VT, CPT>::matAddition(CSC &b)
+{
+	CSC c;
+	c.colPtr_.resize(colPtr_.size()+1); 
+	//c.row
+	//c.colPtr_.resize(colPtr_.size()+1); 
+	// size_t n=get_ncols();
+	// pvector<VT> column_size_vector(n);
+	size_t i,j,k,m;
+	// for(size_t i = 0; i < colPtr_.size(); i++)
+	for(i = 0; i < colPtr_.size(); i++)
+	{
+		//for(size_t j=colPtr_[i],k=b.colPtr_[i];j<colPtr_[i+1] && k<b.colPtr_[i+1];)
+		for(j=colPtr_[i],k=b.colPtr_[i];j<colPtr_[i+1] && k<b.colPtr_[i+1];)
+		{
+			if(rowIds_[j]==b.rowIds_[k])
+			{
+				//column_size_vector[i]++;
+				//c.colPtr_[i]++;
+				c.colPtr_[i+1]++;
+				j++;
+				k++;
+			}
+			else if(rowIds_[j]<b.rowIds_[k])
+			{
+				//column_size_vector[i]++;
+				//c.colPtr_[i]++;
+				c.colPtr_[i+1]++;
+				j++;
+			}
+			else
+			{
+				//column_size_vector[i]++;
+				//c.colPtr_[i]++;
+				c.colPtr_[i+1]++;
+				k++;
+			}
+		}
+	}
+	while (j<colPtr_[i+1]) 
+	{
+    	c.colPtr_[i+1]++;
+		j++;
+  	}
+	while (k<colPtr_[i+1]) 
+	{
+    	c.colPtr_[i+1]++;
+		k++;
+  	}
+	c.colPtr_[0]=0;
+	for (size_t index_prefix_sum = 1; index_prefix_sum < c.colPtr_.size(); index_prefix_sum++)
+	{
+		c.colPtr_[index_prefix_sum]=c.colPtr_[index_prefix_sum]+colPtr_[index_prefix_sum-1];
+	}
+	c.rowIds_.resize(c.colPtr_[c.colPtr_.size()-1]);
+	c.nzVals_.resize(c.colPtr_[c.colPtr_.size()-1]);
+	//for(size_t i = 0; i < colPtr_.size(); i++)
+	for(i = 0; i < colPtr_.size(); i++)
+	{
+		//for(size_t j=colPtr_[i],k=b.colPtr_[i],m=c.colPtr_[i];j<colPtr_[i+1] && k<b.colPtr_[i+1] && m<c.colPtr_[i+1];)
+		for(j=colPtr_[i],k=b.colPtr_[i],m=c.colPtr_[i];j<colPtr_[i+1] && k<b.colPtr_[i+1] && m<c.colPtr_[i+1];)
+		{
+			if(rowIds_[j]==b.rowIds_[k])
+			{
+				c.nzVals_[m]=nzVals_[j]+b.nzVals_[k];
+				c.rowIds_[m]=rowIds_[j];
+				j++;
+				k++;
+				m++;
+
+			}
+			else if(rowIds_[j]<b.rowIds_[k])
+			{
+				c.nzVals_[m]=nzVals_[j];
+				c.rowIds_[m]=rowIds_[j];
+				j++;
+				//k++;
+				m++;
+
+			}
+			else
+			{
+				c.nzVals_[m]=b.nzVals_[k];
+				c.rowIds_[m]=b.rowIds_[k];
+				//j++;
+				k++;
+				m++;
+
+			}
+
+			//c.nzVals_[m]=nzVals_[j]+b.nzVals_[k];
+		}
+	}
+	c.PrintInfo();
+	
 }
 
 template <typename RIT, typename VT, typename CPT>
