@@ -30,6 +30,7 @@ int main(int argc, char* argv[]){
     pvector<float> column_vector_1(n);
     //pvector<float> column_vector_1(n);
 
+
     pvector<float> column_reduce_vector(n);
     // pvector<float> column_reduce_vector(n);
     
@@ -37,16 +38,22 @@ int main(int argc, char* argv[]){
     {
 		column_vector_1[j]=2;
 	}
-    csc.dimApply(column_vector_1);
+    
+    //csc.dimApply(column_vector_1);
 
     //pvector
 
     //csc.dimApply(column_vector);
     //csc.dimApply1(column_vector_1);
     //csc.dimApply1(column_vector_1);
-    std::cout<<"Column reduce here "<<std::endl;
-    csc.column_reduce();
-    csc.matAddition(csc1);
+
+
+    // std::cout<<"Column reduce here "<<std::endl;
+    // csc.column_reduce();
+    std::cout<<"Mat Addition here: "<<std::endl;
+    csc.matAddition_1(csc1);
+
+
     //column_reduce_vector=csc.column_reduce_1();
     //column_reduce_vector=csc.column_reduce_1();
 	return 0;
