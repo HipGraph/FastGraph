@@ -20,10 +20,11 @@ int main(int argc, char* argv[]){
     CSC<uint32_t, float, uint32_t> csc1(coo);
 
 
-    csc.PrintInfo();
+    
     //std::cout<<"ewise"<<std::endl;
     //csc.ewiseApply(2);
-    std::cout<<"DimApply1 here"<<std::endl;
+    
+    //std::cout<<"DimApply1 here"<<std::endl;
     size_t n=csc.get_ncols();
     std::vector<int> column_vector(n, 2);
     //pvector vect(n,1);
@@ -50,8 +51,21 @@ int main(int argc, char* argv[]){
 
     // std::cout<<"Column reduce here "<<std::endl;
     // csc.column_reduce();
-    std::cout<<"Mat Addition here: "<<std::endl;
-    csc.matAddition_1(csc1);
+    //std::cout<<"Mat Addition here: "<<std::endl;
+    //csc.matAddition_1(csc1);
+    std::cout<<"Information for the 2 matrices.."<<std::endl;
+    csc.PrintInfo();
+    std::cout<<"Mat Addition here..."<<std::endl;
+    //csc.matAddition(csc1);
+    //csc.matAddition_1(csc1);
+    //csc.matAddition_2(csc1);
+    csc.matAddition_2(csc1);
+    //csc.matAddition_3(csc1);
+    //csc.PrintInfo();
+
+
+
+
 
 
     //column_reduce_vector=csc.column_reduce_1();
