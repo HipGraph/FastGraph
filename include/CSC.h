@@ -245,10 +245,8 @@ template <typename RIT, typename VT, typename CPT>
 void CSC<RIT, VT, CPT>::matAddition_2(CSC &b)
 {
 	pvector<CPT> c_colPtr_;
-	//pvector<RIT> c_rowIds_;
-	//pvector<VT> c_nzVals_;
+	
 	c_colPtr_.resize(ncols_+1);
-	//std::cout<<"HEYYYY1"<<std::endl;
 	for (size_t index_for_initialization = 0; index_for_initialization < ncols_+1; index_for_initialization++)
 	{
 		c_colPtr_[index_for_initialization]=0;
@@ -286,11 +284,21 @@ void CSC<RIT, VT, CPT>::matAddition_2(CSC &b)
     	c_colPtr_[i+1]++;
 		k++;
   	}
+	// std::cout<<"Before"<<std::endl;
+	// for (size_t index_prefix_sum = 0; index_prefix_sum < c_colPtr_.size(); index_prefix_sum++)
+	// {
+	// 	std::cout<<c_colPtr_[index_prefix_sum]<<std::endl;
+	// }
 	std::cout<<"Colptr vector for c is set here"<<std::endl;
 	for (size_t index_prefix_sum = 1; index_prefix_sum < c_colPtr_.size(); index_prefix_sum++)
 	{
 		c_colPtr_[index_prefix_sum]=c_colPtr_[index_prefix_sum]+c_colPtr_[index_prefix_sum-1];
 	}
+	// std::cout<<"After"<<std::endl;
+	// for (size_t index_prefix_sum = 0; index_prefix_sum < c_colPtr_.size(); index_prefix_sum++)
+	// {
+	// 	std::cout<<c_colPtr_[index_prefix_sum]<<std::endl;
+	// }
 	
 	
 	size_t resizing_value=c_colPtr_[c_colPtr_.size()-1];
@@ -299,9 +307,7 @@ void CSC<RIT, VT, CPT>::matAddition_2(CSC &b)
 
 	pvector<RIT> c_rowIds_(resizing_value);
 	pvector<VT> c_nzVals_(resizing_value);
-	// c_rowIds_.resize(resizing_value);
-	// c_nzVals_.resize(resizing_value);
-
+	
 	for(i = 0; i < ncols_; i++)
 	{
 		for(j=colPtr_[i],k=b.colPtr_[i],m=c_colPtr_[i];j<colPtr_[i+1] && k<b.colPtr_[i+1] && m<c_colPtr_[i+1];)
@@ -334,6 +340,7 @@ void CSC<RIT, VT, CPT>::matAddition_2(CSC &b)
 
 		}
 	}
+
 
 	size_t c_nnz= c_nzVals_.size();
 	CSC c(nrows_, ncols_,c_nnz,false,false);
