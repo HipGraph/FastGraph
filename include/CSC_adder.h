@@ -18,24 +18,6 @@
 #include <tuple>
 #include <fstream>
 
-/*
-INDEX:
-usage: CSC<RIT, VT, CPT> add_vec_of_matrices_{id}<RIT, CIT, VT, CPT, NM>(vector<CSC<RIT, VT, CPT> * > & )
-where :
-NM is type for number_of_matrices to merge
-
-{id} = 
-1 => unordered_map with push_back
-2 => unordered_map with push_back and locks
-3 => unordered_map with symbolic step
-4 => heaps with symbolic step
-5 => radix sort with symbolic step
-6 => row_size_pvector_maintaining_sum with symbolic step
-
-Note: ParallelPrefixSum from utils.h is used in here
-
-*/
-
 
 //..........................................................................//
 template <typename RIT, typename CIT, typename VT= long double, typename CPT=size_t, typename NM>
