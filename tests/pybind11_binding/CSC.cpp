@@ -1,6 +1,3 @@
-#ifndef _CSC_H_
-#define _CSC_H_
-
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
@@ -10,15 +7,14 @@
 #include <vector>
 
 
-#include "COO.h"
-#include "utils.h"
-#include "GAP/timer.h"
-#include "GAP/util.h"
-#include "GAP/pvector.h"
-#include "GAP/platform_atomics.h"
+// #include "../../include/COO.h"
+#include "../../include/utils.h"
+#include "../../include/GAP/timer.h"
+#include "../../include/GAP/util.h"
+#include "../../include/GAP/pvector.h"
+#include "../../include/GAP/platform_atomics.h"
 
 #include <numeric>
-//#include "gtest/gtest.h"
 
 
 
@@ -42,12 +38,12 @@ class CSC
 public:
 	CSC(): nrows_(0), ncols_(0), nnz_(0), isColSorted_(false) {}
 
-	CSC(RIT nrows, size_t ncols, size_t nnz,bool col_sort_bool, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), isColSorted_(col_sort_bool), isWeighted_(isWeighted) 
-    {
-		rowIds_.resize(nnz); 
-        colPtr_.resize(ncols+1); 
-        nzVals_.resize(nnz);
-    }  // added by abhishek
+	// CSC(RIT nrows, size_t ncols, size_t nnz,bool col_sort_bool, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), isColSorted_(col_sort_bool), isWeighted_(isWeighted) 
+    // {
+	// 	rowIds_.resize(nnz); 
+    //     colPtr_.resize(ncols+1); 
+    //     nzVals_.resize(nnz);
+    // }  // added by abhishek
 
 	template <typename CIT>
 	CSC(COO<RIT, CIT, VT> & cooMat);
@@ -62,26 +58,26 @@ public:
     
     const CPT get_colPtr(size_t idx);
 
-	CSC<RIT, VT, CPT>(CSC<RIT, VT, CPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isColSorted_(other.isColSorted_)   // added by abhishek
-	{
-		rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
-		colPtr_ = std::move(other.colPtr_);
-		rowIds_ = std::move(other.rowIds_);
-		nzVals_ = std::move(other.nzVals_);
-	}
+	// CSC<RIT, VT, CPT>(CSC<RIT, VT, CPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isColSorted_(other.isColSorted_)   // added by abhishek
+	// {
+	// 	rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
+	// 	colPtr_ = std::move(other.colPtr_);
+	// 	rowIds_ = std::move(other.rowIds_);
+	// 	nzVals_ = std::move(other.nzVals_);
+	// }
 
-	CSC<RIT, VT, CPT>& operator= (CSC<RIT, VT, CPT> && other){ // added by abhishek
-		nrows_ = other.nrows_;
-		ncols_ = other.ncols_;
-		nnz_ = other.nnz_;
-		isWeighted_ = other.isWeighted_;
-		isColSorted_ = other.isColSorted_;
-		rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
-		colPtr_ = std::move(other.colPtr_);
-		rowIds_ = std::move(other.rowIds_);
-		nzVals_ = std::move(other.nzVals_);
-		return *this;
-	}
+	// CSC<RIT, VT, CPT>& operator= (CSC<RIT, VT, CPT> && other){ // added by abhishek
+	// 	nrows_ = other.nrows_;
+	// 	ncols_ = other.ncols_;
+	// 	nnz_ = other.nnz_;
+	// 	isWeighted_ = other.isWeighted_;
+	// 	isColSorted_ = other.isColSorted_;
+	// 	rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
+	// 	colPtr_ = std::move(other.colPtr_);
+	// 	rowIds_ = std::move(other.rowIds_);
+	// 	nzVals_ = std::move(other.nzVals_);
+	// 	return *this;
+	// }
     
     bool operator== (const CSC<RIT, VT, CPT> & other);
 
@@ -802,4 +798,3 @@ void CSC<RIT, VT, CPT>::column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int
 }
 
 
-#endif

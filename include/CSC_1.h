@@ -1,5 +1,5 @@
-#ifndef _CSC_H_
-#define _CSC_H_
+#ifndef _CSC_1_H_
+#define _CSC_1_H_
 
 #include <algorithm>
 #include <cassert>
@@ -37,12 +37,12 @@ Hence, we use an optional type CPT for such cases. By default, CPT=size_t
 // VT: Value Type
 // CPT: Column pointer type (use only for very tall and skinny matrices)
 template <typename RIT, typename VT=double, typename CPT=size_t>
-class CSC
+class CSC_1
 {
 public:
-	CSC(): nrows_(0), ncols_(0), nnz_(0), isColSorted_(false) {}
+	CSC_1(): nrows_(0), ncols_(0), nnz_(0), isColSorted_(false) {}
 
-	CSC(RIT nrows, size_t ncols, size_t nnz,bool col_sort_bool, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), isColSorted_(col_sort_bool), isWeighted_(isWeighted) 
+	CSC_1(RIT nrows, size_t ncols, size_t nnz,bool col_sort_bool, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), isColSorted_(col_sort_bool), isWeighted_(isWeighted) 
     {
 		rowIds_.resize(nnz); 
         colPtr_.resize(ncols+1); 
@@ -50,7 +50,7 @@ public:
     }  // added by abhishek
 
 	template <typename CIT>
-	CSC(COO<RIT, CIT, VT> & cooMat);
+	CSC_1(COO<RIT, CIT, VT> & cooMat);
 	
 	template <typename AddOp>
 	void MergeDuplicateSort(AddOp binop);
@@ -62,7 +62,7 @@ public:
     
     const CPT get_colPtr(size_t idx);
 
-	CSC<RIT, VT, CPT>(CSC<RIT, VT, CPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isColSorted_(other.isColSorted_)   // added by abhishek
+	CSC_1<RIT, VT, CPT>(CSC_1<RIT, VT, CPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isColSorted_(other.isColSorted_)   // added by abhishek
 	{
 		rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
 		colPtr_ = std::move(other.colPtr_);
@@ -70,7 +70,7 @@ public:
 		nzVals_ = std::move(other.nzVals_);
 	}
 
-	CSC<RIT, VT, CPT>& operator= (CSC<RIT, VT, CPT> && other){ // added by abhishek
+	CSC_1<RIT, VT, CPT>& operator= (CSC_1<RIT, VT, CPT> && other){ // added by abhishek
 		nrows_ = other.nrows_;
 		ncols_ = other.ncols_;
 		nnz_ = other.nnz_;
@@ -83,7 +83,7 @@ public:
 		return *this;
 	}
     
-    bool operator== (const CSC<RIT, VT, CPT> & other);
+    bool operator== (const CSC_1<RIT, VT, CPT> & other);
 
 
 	size_t get_ncols(); // added by abhishek
@@ -117,16 +117,16 @@ public:
 	pvector<T> column_reduce_1();
 
 	
-	void matAddition(CSC &b);
+	void matAddition(CSC_1 &b);
 
-	void matAddition_1(CSC &b);
+	void matAddition_1(CSC_1 &b);
 
-	void matAddition_2(CSC &b);
+	void matAddition_2(CSC_1 &b);
 
-	void matAddition_3(CSC &b);
+	void matAddition_3(CSC_1 &b);
 
 
-    void column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int nsplit);
+    void column_split(std::vector< CSC_1<RIT, VT, CPT>* > &vec, int nsplit);
 private:
 	size_t nrows_;
 	size_t ncols_;
@@ -140,7 +140,7 @@ private:
 };
 
 template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::ewiseApply(VT scalar)
+void CSC_1<RIT, VT, CPT>::ewiseApply(VT scalar)
 {
 	std::cout<<"Scalar"<<scalar<<std::endl;
 	std::cout<<"\n"<<std::endl;
@@ -168,7 +168,7 @@ void CSC<RIT, VT, CPT>::ewiseApply(VT scalar)
 
 template <typename RIT, typename VT, typename CPT>
 template<typename T>
-void CSC<RIT, VT, CPT>::dimApply(pvector<T> &mul_vector)
+void CSC_1<RIT, VT, CPT>::dimApply(pvector<T> &mul_vector)
 {
 	for(size_t i = 0; i < colPtr_.size(); i++)
 	{
@@ -196,11 +196,10 @@ void CSC<RIT, VT, CPT>::dimApply(pvector<T> &mul_vector)
 
 
 template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::column_reduce()
+void CSC_1<RIT, VT, CPT>::column_reduce()
 {
 	
 	size_t n=get_ncols();
-	//std::cout<<"n:"<<colPtr_.size()<<std::endl;
 	pvector<float> result_vector(n+1);
 	for(size_t i = 0; i < colPtr_.size()-1; i++)
 	{
@@ -227,7 +226,7 @@ void CSC<RIT, VT, CPT>::column_reduce()
 
 template <typename RIT, typename VT, typename CPT>
 template<typename T>
-pvector<T> CSC<RIT, VT, CPT>::column_reduce_1()
+pvector<T> CSC_1<RIT, VT, CPT>::column_reduce_1()
 {
 	size_t n=get_ncols();
 	pvector<T> result_vector(n+1);
@@ -250,7 +249,7 @@ pvector<T> CSC<RIT, VT, CPT>::column_reduce_1()
 
 
 template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::matAddition_2(CSC &b)
+void CSC_1<RIT, VT, CPT>::matAddition_2(CSC_1 &b)
 {
 	pvector<CPT> c_colPtr_;
 	
@@ -351,7 +350,7 @@ void CSC<RIT, VT, CPT>::matAddition_2(CSC &b)
 
 
 	size_t c_nnz= c_nzVals_.size();
-	CSC c(nrows_, ncols_,c_nnz,false,false);
+	CSC_1 c(nrows_, ncols_,c_nnz,false,false);
 
 	for (size_t i=0; i<c_colPtr_.size(); i++)
 	{
@@ -377,7 +376,7 @@ void CSC<RIT, VT, CPT>::matAddition_2(CSC &b)
 
 
 template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::matAddition_3(CSC &b)
+void CSC_1<RIT, VT, CPT>::matAddition_3(CSC_1 &b)
 {
 	pvector<CPT> c_colPtr_;
 	pvector<RIT> c_rowIds_;
@@ -467,7 +466,7 @@ void CSC<RIT, VT, CPT>::matAddition_3(CSC &b)
 	}
 
 	size_t c_nnz= c_nzVals_.size();
-	CSC c(nrows_, ncols_,c_nnz,false,false);
+	CSC_1 c(nrows_, ncols_,c_nnz,false,false);
 
 	for (size_t i=0; i<c_colPtr_.size(); i++)
 	{
@@ -487,25 +486,25 @@ void CSC<RIT, VT, CPT>::matAddition_3(CSC &b)
 }
 
 template <typename RIT, typename VT, typename CPT>
-const pvector<CPT>* CSC<RIT, VT, CPT>::get_colPtr()
+const pvector<CPT>* CSC_1<RIT, VT, CPT>::get_colPtr()
 {
 	return &colPtr_;
 }
 
 template <typename RIT, typename VT, typename CPT>
-const CPT CSC<RIT, VT, CPT>::get_colPtr(size_t idx)
+const CPT CSC_1<RIT, VT, CPT>::get_colPtr(size_t idx)
 {
     return colPtr_[idx];
 }
 
 template <typename RIT, typename VT, typename CPT>
-const pvector<RIT>*  CSC<RIT, VT, CPT>::get_rowIds()
+const pvector<RIT>*  CSC_1<RIT, VT, CPT>::get_rowIds()
 {
 	return &rowIds_;
 }
 
 template <typename RIT, typename VT, typename CPT>
-const pvector<VT>* CSC<RIT, VT, CPT>::get_nzVals()
+const pvector<VT>* CSC_1<RIT, VT, CPT>::get_nzVals()
 {
 	return &nzVals_;
 } 
@@ -513,27 +512,27 @@ const pvector<VT>* CSC<RIT, VT, CPT>::get_nzVals()
 
 
 template <typename RIT, typename VT, typename CPT>
-size_t CSC<RIT, VT, CPT>:: get_ncols()
+size_t CSC_1<RIT, VT, CPT>:: get_ncols()
 {
 	return ncols_;
 }
 
 template <typename RIT, typename VT, typename CPT>
-size_t CSC<RIT, VT, CPT>:: get_nrows()
+size_t CSC_1<RIT, VT, CPT>:: get_nrows()
 {
 	return nrows_;
 }
 
 template <typename RIT, typename VT, typename CPT>
-size_t CSC<RIT, VT, CPT>:: get_nnz()
+size_t CSC_1<RIT, VT, CPT>:: get_nnz()
 {
 	return nnz_;
 }
 
 template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::print_all()
+void CSC_1<RIT, VT, CPT>::print_all()
 {
-	//std::cout << "CSC matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl<<"column_pointer_array"<<std::endl;
+	//std::cout << "CSC_1 matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl<<"column_pointer_array"<<std::endl;
 	std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
 	
 	for(size_t i = 0; i < colPtr_.size(); i++){
@@ -573,7 +572,7 @@ void CSC<RIT, VT, CPT>::print_all()
 
 //TODO: need parallel code
 template <typename RIT, typename VT, typename CPT>
-bool CSC<RIT, VT, CPT>::operator==(const CSC<RIT, VT, CPT> & rhs)
+bool CSC_1<RIT, VT, CPT>::operator==(const CSC_1<RIT, VT, CPT> & rhs)
 {
     if(nnz_ != rhs.nnz_ || nrows_  != rhs.nrows_ || ncols_ != rhs.ncols_) return false;
     bool same = std::equal(colPtr_.begin(), colPtr_.begin()+ncols_+1, rhs.colPtr_.begin());
@@ -584,16 +583,16 @@ bool CSC<RIT, VT, CPT>::operator==(const CSC<RIT, VT, CPT> & rhs)
 }
 
 template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::PrintInfo()
+void CSC_1<RIT, VT, CPT>::PrintInfo()
 {
-	std::cout << "CSC matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl;
+	std::cout << "CSC_1 matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl;
 }
-// Construct an CSC object from COO
+// Construct an CSC_1 object from COO
 // This will be a widely used function
 // Optimize this as much as possible
 template <typename RIT, typename VT, typename CPT>
 template <typename CIT>
-CSC<RIT, VT, CPT>::CSC(COO<RIT, CIT, VT> & cooMat)
+CSC_1<RIT, VT, CPT>::CSC_1(COO<RIT, CIT, VT> & cooMat)
 {
 	Timer t;
 	t.Start();
@@ -605,14 +604,14 @@ CSC<RIT, VT, CPT>::CSC(COO<RIT, CIT, VT> & cooMat)
 	MergeDuplicateSort(std::plus<VT>());
 	isColSorted_ = true;
 	t.Stop();
-	//PrintTime("CSC Creation Time", t.Seconds());
+	//PrintTime("CSC_1 Creation Time", t.Seconds());
 }
 
 
 
 template <typename RIT, typename VT, typename CPT>
 template <typename AddOp>
-void CSC<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
+void CSC_1<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
 {
 	pvector<RIT> sqNnzPerCol(ncols_);
 #pragma omp parallel
@@ -688,7 +687,7 @@ void CSC<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
 
 
 template <typename RIT, typename VT, typename CPT> 
-void CSC<RIT, VT, CPT>::count_sort(pvector<std::pair<RIT, VT> >& all_elements, size_t expon)
+void CSC_1<RIT, VT, CPT>::count_sort(pvector<std::pair<RIT, VT> >& all_elements, size_t expon)
 {
 
 
@@ -727,7 +726,7 @@ void CSC<RIT, VT, CPT>::count_sort(pvector<std::pair<RIT, VT> >& all_elements, s
 
 // here rowIds vector is to be sorted piece by piece given that there are no row repititions in a single column or any zero element in nzVals
 template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::sort_inside_column()
+void CSC_1<RIT, VT, CPT>::sort_inside_column()
 {
 	if(!isColSorted_)
 	{
@@ -775,7 +774,7 @@ void CSC<RIT, VT, CPT>::sort_inside_column()
 }
 
 template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int nsplits)
+void CSC_1<RIT, VT, CPT>::column_split(std::vector< CSC_1<RIT, VT, CPT>* > &vec, int nsplits)
 {   
     vec.resize(nsplits);
     int ncolsPerSplit = ncols_ / nsplits;
@@ -793,7 +792,7 @@ void CSC<RIT, VT, CPT>::column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int
             }
             pvector<RIT> rowIds(rowIds_.begin() + colPtr_[colStart], rowIds_.begin() + colPtr_[colEnd]);
             pvector<VT> nzVals(nzVals_.begin() + colPtr_[colStart], nzVals_.begin() + colPtr_[colEnd]);
-            vec[s] = new CSC<RIT, VT, CPT>(nrows_, colEnd - colStart, colPtr_[colEnd] - colPtr_[colStart], false, true);
+            vec[s] = new CSC_1<RIT, VT, CPT>(nrows_, colEnd - colStart, colPtr_[colEnd] - colPtr_[colStart], false, true);
             vec[s]->cols_pvector(&colPtr);
             vec[s]->nz_rows_pvector(&rowIds);
             vec[s]->nz_vals_pvector(&nzVals);
