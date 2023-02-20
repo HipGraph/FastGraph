@@ -2,8 +2,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/functional.h>
 
-#include "COO.h"
-#include "CSC.h"
+#include "common/COO.h"
+#include "common/CSC.h"
 
 namespace py = pybind11;
 

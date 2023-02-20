@@ -1,5 +1,5 @@
-from .COO import COO_int
-from .COO import CSC_double
+from .csplib import COO_int
+from .csplib import CSC_double
 
 def test():
 	c=COO_int()
