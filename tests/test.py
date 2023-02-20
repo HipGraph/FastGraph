@@ -1,2 +1,2 @@
-from mysplib import test
+from pysplib import test
 test()

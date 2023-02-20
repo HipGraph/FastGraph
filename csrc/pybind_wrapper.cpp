@@ -30,7 +30,7 @@ void define_csc(py::module &m, std::string classname)
 		
 }
 
-PYBIND11_MODULE(COO, m) {
+PYBIND11_MODULE(csplib, m) {
 	define_coo<int32_t,double,int32_t>(m, "COO_int");
 	define_csc<int32_t, double, int32_t>(m, "CSC_double");
 }
