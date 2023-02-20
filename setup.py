@@ -7,8 +7,8 @@ ext_modules = [
     Pybind11Extension("mysplib.COO",
         ["include/pybind_wrapper.cpp"],
 	    extra_objects=[],
-        extra_compile_args=[], 
-        extra_link_args=[],
+	extra_compile_args=["-O3", "-march=native", "-Wall", "-std=c++11", "-lm", "-fopenmp"],
+        extra_link_args=['-lgomp'],
         ),
 ]
 
