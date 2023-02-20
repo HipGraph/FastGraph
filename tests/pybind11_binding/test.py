@@ -1,5 +1,4 @@
-from COO import COO_int
-from COO import CSC_double
+from COO import *
 
 
 c=COO_int()
