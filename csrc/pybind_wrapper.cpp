@@ -4,6 +4,8 @@
 
 #include "common/COO.h"
 #include "common/CSC.h"
+#include "common/CSR.h"
+
 
 namespace py = pybind11;
 
@@ -26,13 +28,25 @@ void define_csc(py::module &m, std::string classname)
 {
 	py::class_<CSC<RIT,VT,CPT>>(m, classname.c_str())
 		.def(py::init<COO<RIT,CIT,VT>&>())
-		.def("column_reduce",&CSC<RIT,VT,CPT>::column_reduce);
+		.def("column_reduce",&CSC<RIT,VT,CPT>::column_reduce)
+		.def("ewiseApply",&CSC<RIT,VT,CPT>::ewiseApply);
 		
 }
+
+
+// template <typename RIT, typename CIT, typename VT=double,typename CPT=size_t>
+// void define_csr(py::module &m,std::string classname)
+// {
+// 	py::class_<CSR<RIT,VT,CPT>>(m, classname.c_str())
+// 		.def(py::init<COO<RIT,CIT,VT>&>());
+// 		// .def("row_reduce",&CSR<RIT,VT,CPT>::row_reduce)
+// 		// .def("ewiseApply",&CSR<RIT,VT,CPT>::ewiseApply);
+// }
 
 PYBIND11_MODULE(csplib, m) {
 	define_coo<int32_t,double,int32_t>(m, "COO_int");
 	define_csc<int32_t, double, int32_t>(m, "CSC_double");
+	//define_csr<int32_t, double, int32_t>(m, "CSR_double");
 }
 
 // PYBIND11_MODULE(CSC, m) {

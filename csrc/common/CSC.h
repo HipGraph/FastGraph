@@ -147,7 +147,7 @@ void CSC<RIT, VT, CPT>::ewiseApply(VT scalar)
 	std::cout<<"Rows, columns and non zero values"<<std::endl;
 	std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
 
-
+	std::cout<<"nzvals"<<nzVals_.size()<<std::endl;
 	for(size_t i = 0; i < nzVals_.size(); i++){
 		nzVals_[i]=nzVals_[i]*scalar;
 		
@@ -202,9 +202,22 @@ void CSC<RIT, VT, CPT>::column_reduce()
 	size_t n=get_ncols();
 	//std::cout<<"n:"<<colPtr_.size()<<std::endl;
 	pvector<float> result_vector(n+1);
-	for(size_t i = 0; i < colPtr_.size()-1; i++)
+	std::cout<<"Column PTR"<<std::endl;
+	for(size_t i = 0; i < colPtr_.size(); i++)
 	{
 		std::cout<<colPtr_[i]<<std::endl;
+		
+	}
+	std::cout<<"Row PTR"<<std::endl;
+
+	for(size_t i = 0; i < rowIds_.size(); i++)
+	{
+		std::cout<<rowIds_[i]<<std::endl;
+		
+	}
+	for(size_t i = 0; i < colPtr_.size()-1; i++)
+	{
+		
 		result_vector[i]=0;
 	}
 	for(size_t i = 0; i < colPtr_.size()-1; i++)
@@ -222,7 +235,7 @@ void CSC<RIT, VT, CPT>::column_reduce()
 	{
 		std::cout<<result_vector[i]<<std::endl;
 	}
-	
+
 }
 
 template <typename RIT, typename VT, typename CPT>

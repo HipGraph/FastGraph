@@ -1,5 +1,7 @@
 from .csplib import COO_int
 from .csplib import CSC_double
+#from .csplib import CSR_double
+
 
 def test():
 	c=COO_int()
@@ -7,16 +9,13 @@ def test():
 
 	c.PrintInfo()
 	d=CSC_double(c)
-	#d=CSC_double()
-	print(type(c))
-	# print(type(d))
-	print(type(d))
-	d.column_reduce()
-	#d(c)
-	#CSC_double(c)
-	#d(c)
-	#d=CSC_double(c)
-	#d=CSC_double(c<int32_t,double,int32_t>)
+	#print("type c",type(c))
+	#print("type d",type(d))
+	#d.column_reduce()
+	d.ewiseApply(2)
 
-
-	#d=CSC(c)
+	#e=CSR_double(c)
+	#print("type e",type(e))
+	#e.ewiseApply(2)
+	#e.row_reduce()
+	
