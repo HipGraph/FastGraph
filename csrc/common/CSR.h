@@ -44,8 +44,8 @@ public:
 
 	CSR(RIT nrows, size_t ncols, size_t nnz,bool col_sort_bool, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), isColSorted_(col_sort_bool), isWeighted_(isWeighted) 
     {
-		rowIds_.resize(nnz); 
-        colPtr_.resize(ncols+1); 
+		rowPtr_.resize(nrows_+1); 
+        colIds_.resize(nnz); 
         nzVals_.resize(nnz);
     }  // added by abhishek
 
@@ -64,9 +64,9 @@ public:
 
 	CSR<RIT, VT, CPT>(CSR<RIT, VT, CPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isColSorted_(other.isColSorted_)   // added by abhishek
 	{
-		rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
-		colPtr_ = std::move(other.colPtr_);
-		rowIds_ = std::move(other.rowIds_);
+		rowPtr_.resize(nnz_); colIds_.resize(ncols_+1); nzVals_.resize(nnz_);
+		colIds_ = std::move(other.colIds_);
+		rowPtr_ = std::move(other.rowPtr_);
 		nzVals_ = std::move(other.nzVals_);
 	}
 
@@ -76,9 +76,9 @@ public:
 		nnz_ = other.nnz_;
 		isWeighted_ = other.isWeighted_;
 		isColSorted_ = other.isColSorted_;
-		rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
-		colPtr_ = std::move(other.colPtr_);
-		rowIds_ = std::move(other.rowIds_);
+		rowPtr_.resize(nnz_); colIds_.resize(ncols_+1); nzVals_.resize(nnz_);
+		colIds_ = std::move(other.colIds_);
+		rowPtr_ = std::move(other.rowPtr_);
 		nzVals_ = std::move(other.nzVals_);
 		return *this;
 	}
@@ -90,8 +90,8 @@ public:
 	size_t get_nrows();
 	size_t get_nnz() ;
 
-	void nz_rows_pvector(pvector<RIT>* row_pointer) { rowIds_ = std::move(*(row_pointer));} // added by abhishek
-	void cols_pvector(pvector<CPT>* column_pointer) {colPtr_ = std::move(*(column_pointer));}
+	void nz_rows_pvector(pvector<RIT>* row_pointer) { rowPtr_ = std::move(*(row_pointer));} // added by abhishek
+	void cols_pvector(pvector<CPT>* column_pointer) {colIds_ = std::move(*(column_pointer));}
 	void nz_vals_pvector(pvector<VT>* value_pointer) {nzVals_ = std::move(*(value_pointer));}
 
 	void count_sort(pvector<std::pair<RIT, VT> >& all_elements, size_t expon); // added by abhishek
@@ -111,10 +111,10 @@ public:
 	void dimApply(pvector<T> &mul_vector);
 
 	//template <typename T>
-	void column_reduce();
+	void row_reduce();
 
 	template <typename T>
-	pvector<T> column_reduce_1();
+	pvector<T> row_reduce_1();
 
 	
 	void matAddition(CSR &b);
@@ -132,8 +132,8 @@ private:
 	size_t ncols_;
 	size_t nnz_;
  
-	pvector<CPT> colPtr_;
-	pvector<RIT> rowIds_;
+	pvector<CPT> colIds_;
+	pvector<RIT> rowPtr_;
 	pvector<VT> nzVals_;
 	bool isWeighted_;
 	bool isColSorted_;
@@ -146,19 +146,19 @@ private:
 template <typename RIT, typename VT, typename CPT>
 const pvector<CPT>* CSR<RIT, VT, CPT>::get_colPtr()
 {
-	return &colPtr_;
+	return &colIds_;
 }
 
 template <typename RIT, typename VT, typename CPT>
 const CPT CSR<RIT, VT, CPT>::get_colPtr(size_t idx)
 {
-    return colPtr_[idx];
+    return colIds_[idx];
 }
 
 template <typename RIT, typename VT, typename CPT>
 const pvector<RIT>*  CSR<RIT, VT, CPT>::get_rowIds()
 {
-	return &rowIds_;
+	return &rowPtr_;
 }
 
 template <typename RIT, typename VT, typename CPT>
@@ -187,44 +187,44 @@ size_t CSR<RIT, VT, CPT>:: get_nnz()
 	return nnz_;
 }
 
-// template <typename RIT, typename VT, typename CPT>
-// void CSR<RIT, VT, CPT>::print_all()
-// {
-// 	//std::cout << "CSR matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl<<"column_pointer_array"<<std::endl;
-// 	std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
+template <typename RIT, typename VT, typename CPT>
+void CSR<RIT, VT, CPT>::print_all()
+{
+	//std::cout << "CSR matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl<<"column_pointer_array"<<std::endl;
+	std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
 	
-// 	for(size_t i = 0; i < colPtr_.size(); i++){
-// 		std::cout<<colPtr_[i];
-// 		if(i != ncols_){
-// 			std::cout<<" ";
-// 		}else{
-// 			std::cout<<std::endl;
-// 		}
-// 	}
-// 	//std::cout<<std::endl;
-// 	//std::cout<<std::endl<<"row_correspondents"<<std::endl;
-// 	for(size_t i = 0; i < rowIds_.size(); i++){
-// 		std::cout<<rowIds_[i];
-// 		if(i != nnz_-1){
-// 			std::cout<<" ";
-// 		}else{
-// 			std::cout<<std::endl;
-// 		}
-// 	}
-// 	//std::cout<<std::endl;
-// 	//std::cout<<std::endl<<"nz_values"<<std::endl;
-// 	for(size_t i = 0; i < nzVals_.size(); i++){
-// 		std::cout<<nzVals_[i];
-// 		if(i != nnz_-1){
-// 			std::cout<<" ";
-// 		}else{
-// 			std::cout<<std::endl;
-// 		}
-// 	}
+	for(size_t i = 0; i < colIds_.size(); i++){
+		std::cout<<colIds_[i];
+		if(i != ncols_){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+	//std::cout<<std::endl;
+	//std::cout<<std::endl<<"row_correspondents"<<std::endl;
+	for(size_t i = 0; i < rowPtr_.size(); i++){
+		std::cout<<rowPtr_[i];
+		if(i != nnz_-1){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+	//std::cout<<std::endl;
+	//std::cout<<std::endl<<"nz_values"<<std::endl;
+	for(size_t i = 0; i < nzVals_.size(); i++){
+		std::cout<<nzVals_[i];
+		if(i != nnz_-1){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
 	
-// 	//std::cout<<std::endl;
+	//std::cout<<std::endl;
 
-// }
+}
 
 
 
@@ -233,8 +233,8 @@ size_t CSR<RIT, VT, CPT>:: get_nnz()
 // bool CSR<RIT, VT, CPT>::operator==(const CSR<RIT, VT, CPT> & rhs)
 // {
 //     if(nnz_ != rhs.nnz_ || nrows_  != rhs.nrows_ || ncols_ != rhs.ncols_) return false;
-//     bool same = std::equal(colPtr_.begin(), colPtr_.begin()+ncols_+1, rhs.colPtr_.begin());
-//     same = same && std::equal(rowIds_.begin(), rowIds_.begin()+nnz_, rhs.rowIds_.begin());
+//     bool same = std::equal(colIds_.begin(), colIds_.begin()+ncols_+1, rhs.colIds_.begin());
+//     same = same && std::equal(rowPtr_.begin(), rowPtr_.begin()+nnz_, rhs.rowPtr_.begin());
 //     ErrorTolerantEqual<VT> epsilonequal(EPSILON);
 //     same = same && std::equal(nzVals_.begin(), nzVals_.begin()+nnz_, rhs.nzVals_.begin(), epsilonequal );
 //     return same;
@@ -258,7 +258,7 @@ CSR<RIT, VT, CPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 	ncols_ = cooMat.ncols();
 	nnz_ = cooMat.nnz();
 	isWeighted_ = cooMat.isWeighted();
-	cooMat.BinByCol(colPtr_, rowIds_, nzVals_);
+	cooMat.BinByCol(colIds_, rowPtr_, nzVals_);
 	MergeDuplicateSort(std::plus<VT>());
 	isColSorted_ = true;
 	t.Stop();
@@ -266,82 +266,174 @@ CSR<RIT, VT, CPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 }
 
 
+template <typename RIT, typename VT, typename CPT>
+void CSR<RIT, VT, CPT>::ewiseApply(VT scalar)
+{
+	std::cout<<"Scalar"<<scalar<<std::endl;
+	std::cout<<"\n"<<std::endl;
+	std::cout<<"Rows, columns and non zero values"<<std::endl;
+	std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
+	std::cout<<"nzvals"<<nzVals_.size()<<std::endl;
 
-// template <typename RIT, typename VT, typename CPT>
-// template <typename AddOp>
-// void CSR<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
-// {
-// 	pvector<RIT> sqNnzPerCol(ncols_);
-// #pragma omp parallel
-// 	{
-// 		pvector<std::pair<RIT, VT>> tosort;
-// #pragma omp for
-//         for(size_t i=0; i<ncols_; i++)
-//         {
-//             size_t nnzCol = colPtr_[i+1]-colPtr_[i];
-//             sqNnzPerCol[i] = 0;
+
+	for(size_t i = 0; i < nzVals_.size(); i++){
+		nzVals_[i]=nzVals_[i]*scalar;
+		
+	}
+
+	std::cout<<"Nonzero values"<<std::endl;
+	for(size_t i = 0; i < nzVals_.size(); i++){
+		std::cout<<nzVals_[i];
+		if(i != nnz_-1){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+
+}
+
+
+template <typename RIT, typename VT, typename CPT>
+void CSR<RIT, VT, CPT>::row_reduce()
+{
+	
+	size_t n=get_nrows();
+	std::cout<<"n:"<<n<<std::endl;
+	pvector<float> result_vector(n);
+	std::cout<<"rowIds here"<<std::endl;
+	std::cout<<"result_vector size here"<<result_vector.size()<<std::endl;
+	for(size_t i = 0; i < n; i++)
+	{
+		std::cout<<rowPtr_[i]<<std::endl;
+		result_vector[i]=0;
+	}
+	std::cout<<"Indices before rowreduce"<<std::endl;
+	for(size_t i = 0; i < rowPtr_.size()-1; i++)
+	{
+		std::cout<<"i:"<<i<<std::endl;
+		for(size_t j=rowPtr_[i];j<rowPtr_[i+1];j++)
+		{
+			//std::cout<<"j:"<<i<<std::endl;
+			result_vector[i]=result_vector[i]+nzVals_[j];
+			
+		}
+	}
+	std::cout<<"Final Result"<<std::endl;
+	std::cout<<"rowid size: "<<rowPtr_.size()<<std::endl;
+	for(size_t i = 0; i < rowPtr_.size()-1; i++)
+	{
+		std::cout<<result_vector[i]<<std::endl;
+	}
+	
+}
+
+//Multiply each non zero value with a vector
+template <typename RIT, typename VT, typename CPT>
+template<typename T>
+void CSR<RIT, VT, CPT>::dimApply(pvector<T> &mul_vector)
+{
+	for(size_t i = 0; i < colIds_.size(); i++)
+	{
+		
+		for(size_t j=colIds_[i];j<colIds_[i+1];j++)
+		{
+			nzVals_[j]=nzVals_[j]*mul_vector[i];
+		}
+	}
+	std::cout<<"Nonzero values"<<std::endl;
+	for(size_t i = 0; i < nzVals_.size(); i++){
+		std::cout<<nzVals_[i];
+		if(i != nnz_-1){
+			std::cout<<" ";
+		}else{
+			std::cout<<std::endl;
+		}
+	}
+	
+}
+
+
+
+
+
+
+
+template <typename RIT, typename VT, typename CPT>
+template <typename AddOp>
+void CSR<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
+{
+	pvector<RIT> sqNnzPerCol(ncols_);
+#pragma omp parallel
+	{
+		pvector<std::pair<RIT, VT>> tosort;
+#pragma omp for
+        for(size_t i=0; i<ncols_; i++)
+        {
+            size_t nnzCol = colIds_[i+1]-colIds_[i];
+            sqNnzPerCol[i] = 0;
             
-//             if(nnzCol>0)
-//             {
-//                 if(tosort.size() < nnzCol) tosort.resize(nnzCol);
+            if(nnzCol>0)
+            {
+                if(tosort.size() < nnzCol) tosort.resize(nnzCol);
                 
-//                 for(size_t j=0, k=colPtr_[i]; j<nnzCol; ++j, ++k)
-//                 {
-//                     tosort[j] = std::make_pair(rowIds_[k], nzVals_[k]);
-//                 }
+                for(size_t j=0, k=colIds_[i]; j<nnzCol; ++j, ++k)
+                {
+                    tosort[j] = std::make_pair(rowPtr_[k], nzVals_[k]);
+                }
                 
-//                 //TODO: replace with radix or another integer sorting
-//                 sort(tosort.begin(), tosort.begin()+nnzCol);
+                //TODO: replace with radix or another integer sorting
+                sort(tosort.begin(), tosort.begin()+nnzCol);
                 
-//                 size_t k = colPtr_[i];
-//                 rowIds_[k] = tosort[0].first;
-//                 nzVals_[k] = tosort[0].second;
+                size_t k = colIds_[i];
+                rowPtr_[k] = tosort[0].first;
+                nzVals_[k] = tosort[0].second;
                 
-//                 // k points to last updated entry
-//                 for(size_t j=1; j<nnzCol; ++j)
-//                 {
-//                     if(tosort[j].first != rowIds_[k])
-//                     {
-//                         rowIds_[++k] = tosort[j].first;
-//                         nzVals_[k] = tosort[j].second;
-//                     }
-//                     else
-//                     {
-//                         nzVals_[k] = binop(tosort[j].second, nzVals_[k]);
-//                     }
-//                 }
-//                 sqNnzPerCol[i] = k-colPtr_[i]+1;
+                // k points to last updated entry
+                for(size_t j=1; j<nnzCol; ++j)
+                {
+                    if(tosort[j].first != rowPtr_[k])
+                    {
+                        rowPtr_[++k] = tosort[j].first;
+                        nzVals_[k] = tosort[j].second;
+                    }
+                    else
+                    {
+                        nzVals_[k] = binop(tosort[j].second, nzVals_[k]);
+                    }
+                }
+                sqNnzPerCol[i] = k-colIds_[i]+1;
           
-//             }
-//         }
-//     }
+            }
+        }
+    }
     
     
-//     // now squeze
-//     // need another set of arrays
-//     // Think: can we avoid this extra copy with a symbolic step?
-//     pvector<CPT>sqColPtr;
-//     ParallelPrefixSum(sqNnzPerCol, sqColPtr);
-//     nnz_ = sqColPtr[ncols_];
-//     pvector<RIT> sqRowIds(nnz_);
-//     pvector<VT> sqNzVals(nnz_);
+    // now squeze
+    // need another set of arrays
+    // Think: can we avoid this extra copy with a symbolic step?
+    pvector<CPT>sqColPtr;
+    ParallelPrefixSum(sqNnzPerCol, sqColPtr);
+    nnz_ = sqColPtr[ncols_];
+    pvector<RIT> sqRowIds(nnz_);
+    pvector<VT> sqNzVals(nnz_);
 
-// #pragma omp parallel for
-// 	for(size_t i=0; i<ncols_; i++)
-// 	{
-// 		size_t srcStart = colPtr_[i];
-// 		size_t srcEnd = colPtr_[i] + sqNnzPerCol[i];
-// 		size_t destStart = sqColPtr[i];
-// 		std::copy(rowIds_.begin()+srcStart, rowIds_.begin()+srcEnd, sqRowIds.begin()+destStart);
-// 		std::copy(nzVals_.begin()+srcStart, nzVals_.begin()+srcEnd, sqNzVals.begin()+destStart);
-// 	}
+#pragma omp parallel for
+	for(size_t i=0; i<ncols_; i++)
+	{
+		size_t srcStart = colIds_[i];
+		size_t srcEnd = colIds_[i] + sqNnzPerCol[i];
+		size_t destStart = sqColPtr[i];
+		std::copy(rowPtr_.begin()+srcStart, rowPtr_.begin()+srcEnd, sqRowIds.begin()+destStart);
+		std::copy(nzVals_.begin()+srcStart, nzVals_.begin()+srcEnd, sqNzVals.begin()+destStart);
+	}
 	
-// 	// now replace (just pointer swap)
-// 	colPtr_.swap(sqColPtr);
-// 	rowIds_.swap(sqRowIds);
-// 	nzVals_.swap(sqNzVals);
+	// now replace (just pointer swap)
+	colIds_.swap(sqColPtr);
+	rowPtr_.swap(sqRowIds);
+	nzVals_.swap(sqNzVals);
 	
-// }
+}
 
 
 // template <typename RIT, typename VT, typename CPT> 
@@ -391,7 +483,7 @@ CSR<RIT, VT, CPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 // 		#pragma omp parallel for
 // 				for(size_t i=0; i<ncols_; i++)
 // 				{
-// 					size_t nnzCol = colPtr_[i+1]-colPtr_[i];
+// 					size_t nnzCol = colIds_[i+1]-colIds_[i];
 					
 // 					pvector<std::pair<RIT, VT>> tosort(nnzCol);
 // 					RIT max_row = 0;
@@ -399,10 +491,10 @@ CSR<RIT, VT, CPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 // 					{
 // 						//if(tosort.size() < nnzCol) tosort.resize(nnzCol);
 						
-// 						for(size_t j=0, k=colPtr_[i]; j<nnzCol; ++j, ++k)
+// 						for(size_t j=0, k=colIds_[i]; j<nnzCol; ++j, ++k)
 // 						{
-// 							tosort[j] = std::make_pair(rowIds_[k], nzVals_[k]);
-// 							max_row = std::max(max_row, rowIds_[k]);
+// 							tosort[j] = std::make_pair(rowPtr_[k], nzVals_[k]);
+// 							max_row = std::max(max_row, rowPtr_[k]);
 // 						}
 
 // 						//sort(tosort.begin(), tosort.end());
@@ -410,14 +502,14 @@ CSR<RIT, VT, CPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 // 							count_sort(tosort, expon);
 // 						}
 						
-// 						size_t k = colPtr_[i];
-// 						rowIds_[k] = tosort[0].first;
+// 						size_t k = colIds_[i];
+// 						rowPtr_[k] = tosort[0].first;
 // 						nzVals_[k] = tosort[0].second;
 						
 // 						// k points to last updated entry
 // 						for(size_t j=1; j<nnzCol; ++j)
 // 						{
-// 								rowIds_[++k] = tosort[j].first;
+// 								rowPtr_[++k] = tosort[j].first;
 // 								nzVals_[k] = tosort[j].second;
 // 						}
 // 					}
@@ -446,11 +538,11 @@ CSR<RIT, VT, CPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 //             CPT colEnd = (s < nsplits-1) ? (s + 1) * ncolsPerSplit: ncols_;
 //             pvector<CPT> colPtr(colEnd - colStart + 1);
 //             for(int i = 0; colStart+i < colEnd + 1; i++){
-//                 colPtr[i] = colPtr_[colStart + i] - colPtr_[colStart];
+//                 colPtr[i] = colIds_[colStart + i] - colIds_[colStart];
 //             }
-//             pvector<RIT> rowIds(rowIds_.begin() + colPtr_[colStart], rowIds_.begin() + colPtr_[colEnd]);
-//             pvector<VT> nzVals(nzVals_.begin() + colPtr_[colStart], nzVals_.begin() + colPtr_[colEnd]);
-//             vec[s] = new CSR<RIT, VT, CPT>(nrows_, colEnd - colStart, colPtr_[colEnd] - colPtr_[colStart], false, true);
+//             pvector<RIT> rowIds(rowPtr_.begin() + colIds_[colStart], rowPtr_.begin() + colIds_[colEnd]);
+//             pvector<VT> nzVals(nzVals_.begin() + colIds_[colStart], nzVals_.begin() + colIds_[colEnd]);
+//             vec[s] = new CSR<RIT, VT, CPT>(nrows_, colEnd - colStart, colIds_[colEnd] - colIds_[colStart], false, true);
 //             vec[s]->cols_pvector(&colPtr);
 //             vec[s]->nz_rows_pvector(&rowIds);
 //             vec[s]->nz_vals_pvector(&nzVals);

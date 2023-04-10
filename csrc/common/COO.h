@@ -201,24 +201,24 @@ void COO<RIT, CIT, VT>:: BinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinn
 }
 
 
-template <typename RIT, typename CIT, typename VT>
-template<typename CPT>
-void COO<RIT, CIT, VT>:: BinByRow(pvector<CPT>& rowIdsBinned, pvector<RIT>& colPtr, pvector<VT>& nzValsBinned)
-{
-    pvector<RIT> nnzPerRow = NnzPerRow();
-    ParallelPrefixSum(nnzPerRow, rowIdsBinned);
-    pvector<CPT> curPtr(rowIdsBinned.begin(), rowIdsBinned.end());
-    colPtr.resize(nnz_);
-    if(isWeighted_)
-        nzValsBinned.resize(nnz_);
-//#pragma omp parallel for
-    for(size_t i=0; i<nnz_; i++)
-    {
-        size_t pos = fetch_and_add(curPtr[nzRows_[i]], 1);
-        colPtr[pos] = nzCols_[i];
-        if(isWeighted_) nzValsBinned[pos] = nzVals_[i];
-    }
-}
+// template <typename RIT, typename CIT, typename VT>
+// template<typename CPT>
+// void COO<RIT, CIT, VT>:: BinByRow(pvector<CPT>& rowPtr, pvector<RIT>& colIdsBinned, pvector<VT>& nzValsBinned)
+// {
+//     pvector<CPT> nnzPerRow = NnzPerRow();
+//     ParallelPrefixSum(nnzPerRow, rowPtr);
+//     pvector<RIT> curPtr(rowPtr.begin(), rowPtr.end());
+//     colIdsBinned.resize(nnz_);
+//     if(isWeighted_)
+//         nzValsBinned.resize(nnz_);
+// //#pragma omp parallel for
+//     for(size_t i=0; i<nnz_; i++)
+//     {
+//         size_t pos = fetch_and_add(curPtr[nzRows_[i]], 1);
+//         colIdsBinned[pos] = nzCols_[i];
+//         if(isWeighted_) nzValsBinned[pos] = nzVals_[i];
+//     }
+// }
 
 
 
