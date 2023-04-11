@@ -102,8 +102,8 @@ public:
     template<typename CPT>
     void BinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinned, pvector<VT>& nzValsBinned);
 
-    template<typename CPT>
-    void BinByRow(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinned, pvector<VT>& nzValsBinned);
+    template<typename RPT>
+    void BinByRow(pvector<RPT>& rowPtr, pvector<CIT>& rowIdsBinned, pvector<VT>& nzValsBinned);
 
 
     void nz_rows_pvector(pvector<RIT>* row_pointer) { nzRows_ = std::move((*row_pointer));} // added by abhishek
@@ -201,8 +201,26 @@ void COO<RIT, CIT, VT>:: BinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinn
 }
 
 
-// template <typename RIT, typename CIT, typename VT>
-// template<typename CPT>
+template <typename RIT, typename CIT, typename VT>
+template<typename RPT>
+void COO<RIT,CIT,VT>::BinByRow(pvector<RPT>& rowPtr,pvector<CIT>& colIdsBinned,pvector<VT>& nzValsBinned)
+{
+
+    pvector<CIT> nnzPerRow = NnzPerRow();
+    ParallelPrefixSum(nnzPerRow, rowPtr);
+    pvector<RPT> curPtr(rowPtr.begin(), rowPtr.end());
+    colIdsBinned.resize(nnz_);
+    if(isWeighted_)
+        nzValsBinned.resize(nnz_);
+//#pragma omp parallel for
+    for(size_t i=0; i<nnz_; i++)
+    {
+        size_t pos = fetch_and_add(curPtr[nzRows_[i]], 1);
+        colIdsBinned[pos] = nzCols_[i];
+        if(isWeighted_) nzValsBinned[pos] = nzVals_[i];
+    }
+
+}
 // void COO<RIT, CIT, VT>:: BinByRow(pvector<CPT>& rowPtr, pvector<RIT>& colIdsBinned, pvector<VT>& nzValsBinned)
 // {
 //     pvector<CPT> nnzPerRow = NnzPerRow();
