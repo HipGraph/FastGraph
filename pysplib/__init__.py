@@ -12,10 +12,10 @@ def test():
 	#print("type c",type(c))
 	print("type d",type(d))
 	#d.column_reduce()
-	d.ewiseApply(2)
+	#d.ewiseApply(2)
 
 	e=CSR_double(c)
 	print("type e",type(e))
 	#e.ewiseApply(2)
-	#e.row_reduce()
+	e.row_reduce()
 	

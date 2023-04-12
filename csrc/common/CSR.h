@@ -310,7 +310,7 @@ void CSR<CIT, VT, RPT>::row_reduce()
 		}
 	}
 	std::cout<<"Final Result"<<std::endl;
-	std::cout<<"rowid size: "<<rowPtr_.size()<<std::endl;
+	//std::cout<<"rowid size: "<<rowPtr_.size()<<std::endl;
 	for(size_t i = 0; i < rowPtr_.size()-1; i++)
 	{
 		std::cout<<result_vector[i]<<std::endl;
