@@ -50,7 +50,7 @@ public:
     }  // added by abhishek
 
 	template <typename RIT>
-	CSR(COO<CIT, CIT, VT> & cooMat);
+	CSR(COO<RIT, CIT, VT> & cooMat);
 	
 	template <typename AddOp>
 	void MergeDuplicateSort(AddOp binop);
@@ -240,7 +240,7 @@ void CSR<RIT, VT, RPT>::PrintInfo()
 // Optimize this as much as possible
 template <typename CIT, typename VT, typename RPT>
 template <typename RIT>
-CSR<CIT, VT, RPT>::CSR(COO<CIT, CIT, VT> & cooMat)
+CSR<CIT, VT, RPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 {
 	Timer t;
 	t.Start();
@@ -248,7 +248,7 @@ CSR<CIT, VT, RPT>::CSR(COO<CIT, CIT, VT> & cooMat)
 	ncols_ = cooMat.ncols();
 	nnz_ = cooMat.nnz();
 	isWeighted_ = cooMat.isWeighted();
-	cooMat.BinByRow(colIds_, rowPtr_, nzVals_);
+	cooMat.BinByRow(rowPtr_, colIds_, nzVals_);
 	MergeDuplicateSort(std::plus<VT>());
 	isRowSorted_ = true;
 	t.Stop();
@@ -256,8 +256,8 @@ CSR<CIT, VT, RPT>::CSR(COO<CIT, CIT, VT> & cooMat)
 }
 
 
-template <typename RIT, typename VT, typename RPT>
-void CSR<RIT, VT, RPT>::ewiseApply(VT scalar)
+template <typename CIT, typename VT, typename RPT>
+void CSR<CIT, VT, RPT>::ewiseApply(VT scalar)
 {
 	std::cout<<"Scalar"<<scalar<<std::endl;
 	std::cout<<"\n"<<std::endl;
@@ -284,8 +284,8 @@ void CSR<RIT, VT, RPT>::ewiseApply(VT scalar)
 }
 
 
-template <typename RIT, typename VT, typename RPT>
-void CSR<RIT, VT, RPT>::row_reduce()
+template <typename CIT, typename VT, typename RPT>
+void CSR<CIT, VT, RPT>::row_reduce()
 {
 	
 	size_t n=get_nrows();
@@ -319,9 +319,9 @@ void CSR<RIT, VT, RPT>::row_reduce()
 }
 
 //Multiply each non zero value with a vector
-template <typename RIT, typename VT, typename RPT>
+template <typename CIT, typename VT, typename RPT>
 template<typename T>
-void CSR<RIT, VT, RPT>::dimApply(pvector<T> &mul_vector)
+void CSR<CIT, VT, RPT>::dimApply(pvector<T> &mul_vector)
 {
 	for(size_t i = 0; i < colIds_.size(); i++)
 	{
@@ -349,42 +349,42 @@ void CSR<RIT, VT, RPT>::dimApply(pvector<T> &mul_vector)
 
 
 
-template <typename RIT, typename VT, typename RPT>
+template <typename CIT, typename VT, typename RPT>
 template <typename AddOp>
-void CSR<RIT, VT, RPT>::MergeDuplicateSort(AddOp binop)
+void CSR<CIT, VT, RPT>::MergeDuplicateSort(AddOp binop)
 {
-	pvector<RIT> sqNnzPerCol(ncols_);
+	pvector<CIT> sqNnzPerRow(nrows_);
 #pragma omp parallel
 	{
-		pvector<std::pair<RIT, VT>> tosort;
+		pvector<std::pair<CIT, VT>> tosort;
 #pragma omp for
-        for(size_t i=0; i<ncols_; i++)
+        for(size_t i=0; i<nrows_; i++)
         {
-            size_t nnzCol = colIds_[i+1]-colIds_[i];
-            sqNnzPerCol[i] = 0;
+            size_t nnzRow = rowPtr_[i+1]-rowPtr_[i];
+            sqNnzPerRow[i] = 0;
             
-            if(nnzCol>0)
+            if(nnzRow>0)
             {
-                if(tosort.size() < nnzCol) tosort.resize(nnzCol);
+                if(tosort.size() < nnzRow) tosort.resize(nnzRow);
                 
-                for(size_t j=0, k=colIds_[i]; j<nnzCol; ++j, ++k)
+                for(size_t j=0, k=rowPtr_[i]; j<nnzRow; ++j, ++k)
                 {
-                    tosort[j] = std::make_pair(rowPtr_[k], nzVals_[k]);
+                    tosort[j] = std::make_pair(colIds_[k], nzVals_[k]);
                 }
                 
                 //TODO: replace with radix or another integer sorting
-                sort(tosort.begin(), tosort.begin()+nnzCol);
+                sort(tosort.begin(), tosort.begin()+nnzRow);
                 
-                size_t k = colIds_[i];
-                rowPtr_[k] = tosort[0].first;
+                size_t k = rowPtr_[i];
+                colIds_[k] = tosort[0].first;
                 nzVals_[k] = tosort[0].second;
                 
                 // k points to last updated entry
-                for(size_t j=1; j<nnzCol; ++j)
+                for(size_t j=1; j<nnzRow; ++j)
                 {
-                    if(tosort[j].first != rowPtr_[k])
+                    if(tosort[j].first != colIds_[k])
                     {
-                        rowPtr_[++k] = tosort[j].first;
+                        colIds_[++k] = tosort[j].first;
                         nzVals_[k] = tosort[j].second;
                     }
                     else
@@ -392,7 +392,7 @@ void CSR<RIT, VT, RPT>::MergeDuplicateSort(AddOp binop)
                         nzVals_[k] = binop(tosort[j].second, nzVals_[k]);
                     }
                 }
-                sqNnzPerCol[i] = k-colIds_[i]+1;
+                sqNnzPerRow[i] = k-rowPtr_[i]+1;
           
             }
         }
@@ -402,143 +402,28 @@ void CSR<RIT, VT, RPT>::MergeDuplicateSort(AddOp binop)
     // now squeze
     // need another set of arrays
     // Think: can we avoid this extra copy with a symbolic step?
-    pvector<RPT>sqColPtr;
-    ParallelPrefixSum(sqNnzPerCol, sqColPtr);
-    nnz_ = sqColPtr[ncols_];
-    pvector<RIT> sqRowIds(nnz_);
+    pvector<RPT>sqRowPtr;
+    ParallelPrefixSum(sqNnzPerRow, sqRowPtr);
+    nnz_ = sqRowPtr[nrows_];
+    pvector<CIT> sqColIds(nnz_);
     pvector<VT> sqNzVals(nnz_);
 
 #pragma omp parallel for
-	for(size_t i=0; i<ncols_; i++)
+	for(size_t i=0; i<nrows_; i++)
 	{
-		size_t srcStart = colIds_[i];
-		size_t srcEnd = colIds_[i] + sqNnzPerCol[i];
-		size_t destStart = sqColPtr[i];
-		std::copy(rowPtr_.begin()+srcStart, rowPtr_.begin()+srcEnd, sqRowIds.begin()+destStart);
+		size_t srcStart = rowPtr_[i];
+		size_t srcEnd = rowPtr_[i] + sqNnzPerRow[i];
+		size_t destStart = sqRowPtr[i];
+		std::copy(colIds_.begin()+srcStart, colIds_.begin()+srcEnd, sqColIds.begin()+destStart);
 		std::copy(nzVals_.begin()+srcStart, nzVals_.begin()+srcEnd, sqNzVals.begin()+destStart);
 	}
 	
 	// now replace (just pointer swap)
-	colIds_.swap(sqColPtr);
-	rowPtr_.swap(sqRowIds);
+	
+	rowPtr_.swap(sqRowPtr);
+	colIds_.swap(sqColIds);
 	nzVals_.swap(sqNzVals);
 	
 }
-
-
-// template <typename RIT, typename VT, typename RPT> 
-// void CSR<RIT, VT, RPT>::count_sort(pvector<std::pair<RIT, VT> >& all_elements, size_t expon)
-// {
-
-
-// 	size_t num_of_elements = all_elements.size();
-
-// 	pvector<std::pair<RIT, VT> > temp_array(num_of_elements);
-// 	RIT count[10] = {0};
-// 	size_t index_for_count;
-
-// 	for(size_t i = 0; i < num_of_elements; i++){
-// 		index_for_count = ((all_elements[i].first)/expon)%10;
-// 		count[index_for_count]++;
-// 	}
-
-// 	for(int i = 1; i < 10; i++){
-// 		count[i] += count[i-1];
-// 	}
-
-// 	for(size_t i = num_of_elements-1; i > 0; i--){
-// 		index_for_count = ((all_elements[i].first)/expon)%10;
-// 		temp_array[count[index_for_count] -1] = all_elements[i];
-// 		count[index_for_count]--;
-// 	}
-
-
-// 	index_for_count = ((all_elements[0].first)/expon)%10;
-// 	temp_array[count[index_for_count] -1] = all_elements[0];
-
-// 	all_elements = std::move(temp_array);
-
-// 	return;
-// }
-
-
-
-
-// // here rowIds vector is to be sorted piece by piece given that there are no row repititions in a single column or any zero element in nzVals
-// template <typename RIT, typename VT, typename RPT>
-// void CSR<RIT, VT, RPT>::sort_inside_column()
-// {
-// 	if(!isRowSorted_)
-// 	{
-// 		#pragma omp parallel for
-// 				for(size_t i=0; i<ncols_; i++)
-// 				{
-// 					size_t nnzCol = colIds_[i+1]-colIds_[i];
-					
-// 					pvector<std::pair<RIT, VT>> tosort(nnzCol);
-// 					RIT max_row = 0;
-// 					if(nnzCol>0)
-// 					{
-// 						//if(tosort.size() < nnzCol) tosort.resize(nnzCol);
-						
-// 						for(size_t j=0, k=colIds_[i]; j<nnzCol; ++j, ++k)
-// 						{
-// 							tosort[j] = std::make_pair(rowPtr_[k], nzVals_[k]);
-// 							max_row = std::max(max_row, rowPtr_[k]);
-// 						}
-
-// 						//sort(tosort.begin(), tosort.end());
-// 						for(size_t expon = 1; max_row/expon > 0; expon *= 10){
-// 							count_sort(tosort, expon);
-// 						}
-						
-// 						size_t k = colIds_[i];
-// 						rowPtr_[k] = tosort[0].first;
-// 						nzVals_[k] = tosort[0].second;
-						
-// 						// k points to last updated entry
-// 						for(size_t j=1; j<nnzCol; ++j)
-// 						{
-// 								rowPtr_[++k] = tosort[j].first;
-// 								nzVals_[k] = tosort[j].second;
-// 						}
-// 					}
-// 				}
-			
-
-// 			isRowSorted_ = true;
-// 	}
-// 	else{
-// 		return;
-// 	}
-// }
-
-// template <typename RIT, typename VT, typename RPT>
-// void CSR<RIT, VT, RPT>::column_split(std::vector< CSR<RIT, VT, RPT>* > &vec, int nsplits)
-// {   
-//     vec.resize(nsplits);
-//     int ncolsPerSplit = ncols_ / nsplits;
-// #pragma omp parallel
-//     {
-//         int tid = omp_get_thread_num();
-//         int nthreads = omp_get_num_threads();
-// #pragma omp for
-//         for(int s = 0; s < nsplits; s++){
-//             RPT colStart = s * ncolsPerSplit;
-//             RPT colEnd = (s < nsplits-1) ? (s + 1) * ncolsPerSplit: ncols_;
-//             pvector<RPT> colPtr(colEnd - colStart + 1);
-//             for(int i = 0; colStart+i < colEnd + 1; i++){
-//                 colPtr[i] = colIds_[colStart + i] - colIds_[colStart];
-//             }
-//             pvector<RIT> rowIds(rowPtr_.begin() + colIds_[colStart], rowPtr_.begin() + colIds_[colEnd]);
-//             pvector<VT> nzVals(nzVals_.begin() + colIds_[colStart], nzVals_.begin() + colIds_[colEnd]);
-//             vec[s] = new CSR<RIT, VT, RPT>(nrows_, colEnd - colStart, colIds_[colEnd] - colIds_[colStart], false, true);
-//             vec[s]->cols_pvector(&colPtr);
-//             vec[s]->nz_rows_pvector(&rowIds);
-//             vec[s]->nz_vals_pvector(&nzVals);
-//         }
-//     }
-// }
-
 
 #endif
