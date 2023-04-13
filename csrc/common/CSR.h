@@ -49,6 +49,7 @@ public:
         nzVals_.resize(nnz);
     }  // added by abhishek
 
+	//written by Shardul
 	template <typename RIT>
 	CSR(COO<RIT, CIT, VT> & cooMat);
 	
@@ -62,6 +63,7 @@ public:
     
     const RPT get_rowPtr(size_t idx);
 
+	//Copy constructor, written by Shardul
 	CSR<CIT, VT, RPT>(CSR<CIT, VT, RPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isRowSorted_(other.isRowSorted_)   // added by abhishek
 	{
 		rowPtr_.resize(nrows_+1); colIds_.resize(nnz_); nzVals_.resize(nnz_);
@@ -70,6 +72,7 @@ public:
 		nzVals_ = std::move(other.nzVals_);
 	}
 
+	//Overloaded equal to operator
 	CSR<CIT, VT, RPT>& operator= (CSR<CIT, VT, RPT> && other){ // added by abhishek
 		nrows_ = other.nrows_;
 		ncols_ = other.ncols_;
@@ -94,28 +97,26 @@ public:
 	void nz_cols_pvector(pvector<CIT>* column_pointer) {colIds_ = std::move(*(column_pointer));}
 	void nz_vals_pvector(pvector<VT>* value_pointer) {nzVals_ = std::move(*(value_pointer));}
 
-	//void count_sort(pvector<std::pair<RIT, VT> >& all_elements, size_t expon); // added by abhishek
-	//void sort_inside_column();
+	
 
 	void print_all(); // added by abhishek
     
 	
+	// written by Shardul
 	void ewiseApply(VT scalar);
-	//void ewiseApply1(VT scalar);
 
 
-	// template <typename T>
-	// void dimApply(std::vector<T> mul_vector);
-
+	
+	// written by Shardul
 	template <typename T>
 	void dimApply(pvector<T> &mul_vector);
 
-	//template <typename T>
+
+	// written by Shardul
 	void row_reduce();
 
 	
 
-    //void column_split(std::vector< CSR<RIT, VT, RPT>* > &vec, int nsplit);
 private:
 	size_t nrows_;
 	size_t ncols_;
@@ -190,8 +191,7 @@ void CSR<RIT, VT, RPT>::print_all()
 			std::cout<<std::endl;
 		}
 	}
-	//std::cout<<std::endl;
-	//std::cout<<std::endl<<"row_correspondents"<<std::endl;
+	
 	for(size_t i = 0; i < rowPtr_.size(); i++){
 		std::cout<<rowPtr_[i];
 		if(i != nnz_-1){
@@ -200,8 +200,7 @@ void CSR<RIT, VT, RPT>::print_all()
 			std::cout<<std::endl;
 		}
 	}
-	//std::cout<<std::endl;
-	//std::cout<<std::endl<<"nz_values"<<std::endl;
+	
 	for(size_t i = 0; i < nzVals_.size(); i++){
 		std::cout<<nzVals_[i];
 		if(i != nnz_-1){
@@ -211,23 +210,22 @@ void CSR<RIT, VT, RPT>::print_all()
 		}
 	}
 	
-	//std::cout<<std::endl;
 
 }
 
 
 
 //TODO: need parallel code
-// template <typename RIT, typename VT, typename RPT>
-// bool CSR<RIT, VT, RPT>::operator==(const CSR<RIT, VT, RPT> & rhs)
-// {
-//     if(nnz_ != rhs.nnz_ || nrows_  != rhs.nrows_ || ncols_ != rhs.ncols_) return false;
-//     bool same = std::equal(colIds_.begin(), colIds_.begin()+ncols_+1, rhs.colIds_.begin());
-//     same = same && std::equal(rowPtr_.begin(), rowPtr_.begin()+nnz_, rhs.rowPtr_.begin());
-//     ErrorTolerantEqual<VT> epsilonequal(EPSILON);
-//     same = same && std::equal(nzVals_.begin(), nzVals_.begin()+nnz_, rhs.nzVals_.begin(), epsilonequal );
-//     return same;
-// }
+template <typename CIT, typename VT, typename RPT>
+bool CSR<CIT, VT, RPT>::operator==(const CSR<CIT, VT, RPT> & rhs)
+{
+    if(nnz_ != rhs.nnz_ || nrows_  != rhs.nrows_ || ncols_ != rhs.ncols_) return false;
+    bool same = std::equal(rowPtr_.begin(), rowPtr_.begin()+nrows_+1, rhs.rowPtr_.begin());
+    same = same && std::equal(colIds_.begin(), colIds_.begin()+nnz_, rhs.colIds_.begin());
+    ErrorTolerantEqual<VT> epsilonequal(EPSILON);
+    same = same && std::equal(nzVals_.begin(), nzVals_.begin()+nnz_, rhs.nzVals_.begin(), epsilonequal );
+    return same;
+}
 
 template <typename RIT, typename VT, typename RPT>
 void CSR<RIT, VT, RPT>::PrintInfo()
@@ -236,7 +234,7 @@ void CSR<RIT, VT, RPT>::PrintInfo()
 }
 
 // Construct an CSR object from COO
-// This will be a widely used function
+// This will be a widely used function 
 // Optimize this as much as possible
 template <typename CIT, typename VT, typename RPT>
 template <typename RIT>
@@ -252,7 +250,6 @@ CSR<CIT, VT, RPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 	MergeDuplicateSort(std::plus<VT>());
 	isRowSorted_ = true;
 	t.Stop();
-	//PrintTime("CSR Creation Time", t.Seconds());
 }
 
 

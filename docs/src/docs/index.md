@@ -37,3 +37,13 @@ The library is very flexible and interested users can develop custom function bo
     tests			# Contains test cases
     setup.py  			# Run this file to 
     docs/			# Project documentations
+
+
+
+## COO:
+    Coordinate Format Sparse Matrix Class. 
+
+## CSR
+
+    1. CSR(COO<RIT, CIT, VT> & cooMat);
+       Return 
