@@ -17,9 +17,6 @@ void define_coo(py::module &m, std::string classname)
 		.def("GenER", static_cast<void (COO<RIT,CIT,VT>::*)(int,int,bool,int64_t)>(&COO<RIT,CIT,VT>::GenER), "GenER")
 		.def("GenER", static_cast<void (COO<RIT,CIT,VT>::*)(int,int,int,bool,int64_t)>(&COO<RIT,CIT,VT>::GenER), "GenER")
 		.def("PrintInfo",&COO<RIT,CIT,VT>::PrintInfo);
-	
-	// py::class_<CSC<RIT,VT,CPT>>(m, classname.c_str())
-	// 	.def(py::init<COO<RIT,CIT,VT>());
 }
 
 
@@ -39,9 +36,9 @@ void define_csr(py::module &m,std::string classname)
 {
 	py::class_<CSR<CIT,VT,RPT>>(m, classname.c_str())
 		.def(py::init<COO<RIT,CIT,VT>&>())
-		// .def("row_reduce",&CSR<RIT,VT,CPT>::row_reduce)
 		.def("ewiseApply",&CSR<CIT,VT,RPT>::ewiseApply)
 		.def("row_reduce",&CSR<CIT,VT,RPT>::row_reduce);
+		//.def("dimApply",&CSR<CIT,VT,RPT>::dimApply);
 }
 
 PYBIND11_MODULE(csplib, m) {

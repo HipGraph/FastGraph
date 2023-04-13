@@ -99,18 +99,16 @@ public:
 
 	void print_all(); // added by abhishek
     
-	
+	// written by Shardul
 	void ewiseApply(VT scalar);
-	//void ewiseApply1(VT scalar);
 
 
-	// template <typename T>
-	// void dimApply(std::vector<T> mul_vector);
-
+	
+	// written by Shardul
 	template <typename T>
 	void dimApply(pvector<T> &mul_vector);
 
-	//template <typename T>
+	// written by Shardul
 	void column_reduce();
 
 	template <typename T>
@@ -121,8 +119,10 @@ public:
 
 	void matAddition_1(CSC &b);
 
+	// written by Shardul
 	void matAddition_2(CSC &b);
 
+	// written by Shardul
 	void matAddition_3(CSC &b);
 
 

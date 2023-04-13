@@ -320,10 +320,10 @@ template <typename CIT, typename VT, typename RPT>
 template<typename T>
 void CSR<CIT, VT, RPT>::dimApply(pvector<T> &mul_vector)
 {
-	for(size_t i = 0; i < colIds_.size(); i++)
+	for(size_t i = 0; i < rowPtr_.size(); i++)
 	{
 		
-		for(size_t j=colIds_[i];j<colIds_[i+1];j++)
+		for(size_t j=rowPtr_[i];j<rowPtr_[i+1];j++)
 		{
 			nzVals_[j]=nzVals_[j]*mul_vector[i];
 		}

@@ -44,6 +44,7 @@ The library is very flexible and interested users can develop custom function bo
     Coordinate Format Sparse Matrix Class. 
 
 ## CSR
+    Compressed Sparse Row Matrix Class.
 
-    1. CSR(COO<RIT, CIT, VT> & cooMat);
-       Return 
+## CSC
+    Compressed Sparse Column Matrix Class.
