@@ -33,7 +33,7 @@ Hence, we use an optional type RPT for such cases. By default, RPT=size_t
 
 
 
-// CIT: Row Index Type
+// CIT: Column Index Type
 // VT: Value Type
 // RPT: Row pointer type 
 template <typename CIT, typename VT=double, typename RPT=size_t>
