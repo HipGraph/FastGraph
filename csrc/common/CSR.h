@@ -115,6 +115,9 @@ public:
 	// written by Shardul
 	void row_reduce();
 
+	// written by Shardul
+	void matAddition(CSR &b);
+
 	
 
 private:
@@ -422,5 +425,120 @@ void CSR<CIT, VT, RPT>::MergeDuplicateSort(AddOp binop)
 	nzVals_.swap(sqNzVals);
 	
 }
+
+
+template <typename CIT, typename VT, typename RPT>
+void CSR<CIT, VT, RPT>::matAddition(CSR &b)
+{
+	pvector<CIT> c_colIds_;
+	pvector<RPT> c_rowPtr_;
+	pvector<VT> c_nzVals_;
+	c_rowPtr_.resize(nrows_+1);
+	for (size_t index_for_initialization = 0; index_for_initialization < nrows_; index_for_initialization++)
+	{
+		/* code */
+		c_rowPtr_[index_for_initialization]=0;
+	}
+	size_t i,j,k,m;
+	for(i = 0; i < nrows_; i++)
+	{
+		for(j=rowPtr_[i],k=b.rowPtr_[i];j<rowPtr_[i+1] && k<b.rowPtr_[i+1];)
+		{
+			if(colIds_[j]==b.colIds_[k])
+			{
+				c_rowPtr_[i+1]++;
+				j++;
+				k++;
+			}
+			else if(colIds_[j]<b.colIds_[k])
+			{
+				c_rowPtr_[i+1]++;
+				j++;
+			}
+			else
+			{
+				c_rowPtr_[i+1]++;
+				k++;
+			}
+		}
+	}
+	while (j<rowPtr_[i+1]) 
+	{
+    	c_rowPtr_[i+1]++;
+		j++;
+  	}
+	while (k<rowPtr_[i+1]) 
+	{
+    	c_rowPtr_[i+1]++;
+		k++;
+  	}
+	for (size_t index_prefix_sum = 1; index_prefix_sum < c_rowPtr_.size(); index_prefix_sum++)
+	{
+		c_rowPtr_[index_prefix_sum]=c_rowPtr_[index_prefix_sum]+c_rowPtr_[index_prefix_sum-1];
+	}
+	
+	std::cout<<"HEYYYY"<<std::endl;
+
+	size_t resizing_value=c_rowPtr_[c_rowPtr_.size()-1];
+	//std::cout<<resizing_value<<std::endl;
+	c_colIds_.resize(resizing_value);
+	c_nzVals_.resize(resizing_value);
+
+	for(i = 0; i < nrows_; i++)
+	{
+		for(j=rowPtr_[i],k=b.rowPtr_[i],m=c_rowPtr_[i];j<rowPtr_[i+1] && k<b.rowPtr_[i+1] && m<c_rowPtr_[i+1];)
+		{
+			if(colIds_[j]==b.colIds_[k])
+			{
+				c_nzVals_[m]=nzVals_[j]+b.nzVals_[k];
+				c_colIds_[m]=colIds_[j];
+				j++;
+				k++;
+				m++;
+
+			}
+			else if(colIds_[j]<b.colIds_[k])
+			{
+				c_nzVals_[m]=nzVals_[j];
+				c_colIds_[m]=colIds_[j];
+				j++;
+				m++;
+
+			}
+			else
+			{
+				c_nzVals_[m]=b.nzVals_[k];
+				c_colIds_[m]=b.colIds_[k];
+				k++;
+				m++;
+
+			}
+
+		}
+	}
+
+	size_t c_nnz= c_nzVals_.size();
+	CSR c(nrows_, ncols_,c_nnz,false,false);
+
+	for (size_t i=0; i<c_rowPtr_.size(); i++)
+	{
+		c.rowPtr_.push_back(c_rowPtr_[i]);
+	}
+	
+	for (size_t i=0; i<c_colIds_.size(); i++)
+	{
+		c.colIds_.push_back(c_colIds_[i]);
+	}
+
+	for (size_t i=0; i<c_nzVals_.size(); i++)
+	{
+		c.nzVals_.push_back(c_nzVals_[i]);
+	}
+	c.PrintInfo();
+}
+
+
+
+
 
 #endif

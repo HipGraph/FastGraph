@@ -499,6 +499,8 @@ void CSC<RIT, VT, CPT>::matAddition_3(CSC &b)
 	c.PrintInfo();
 }
 
+
+
 template <typename RIT, typename VT, typename CPT>
 const pvector<CPT>* CSC<RIT, VT, CPT>::get_colPtr()
 {
