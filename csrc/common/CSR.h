@@ -52,6 +52,10 @@ public:
 	//written by Shardul
 	template <typename RIT>
 	CSR(COO<RIT, CIT, VT> & cooMat);
+
+	//written by Shardul
+	template <typename CPT,typename RIT>
+	CSR(CSC<RIT,VT,CPT> & cscMat);
 	
 	template <typename AddOp>
 	void MergeDuplicateSort(AddOp binop);
@@ -108,8 +112,8 @@ public:
 
 	
 	// written by Shardul
-	template <typename T>
-	void dimApply(pvector<T> &mul_vector);
+	//template <typename T>
+	void dimApply(pvector<int> &mul_vector);
 
 
 	// written by Shardul
@@ -257,6 +261,26 @@ CSR<CIT, VT, RPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 
 
 template <typename CIT, typename VT, typename RPT>
+template <typename CPT,typename RIT>
+CSR<CIT, VT, RPT>::CSR(CSC<RIT,VT,CPT> & cscMat)
+{
+	cscMat.ncols_=
+	// Timer t;
+	// t.Start();
+	// nrows_ = cooMat.nrows();
+	// ncols_ = cooMat.ncols();
+	// nnz_ = cooMat.nnz();
+	// isWeighted_ = cooMat.isWeighted();
+	// cooMat.BinByRow(rowPtr_, colIds_, nzVals_);
+	// MergeDuplicateSort(std::plus<VT>());
+	// isRowSorted_ = true;
+	// t.Stop();
+}
+
+
+
+
+template <typename CIT, typename VT, typename RPT>
 void CSR<CIT, VT, RPT>::ewiseApply(VT scalar)
 {
 	std::cout<<"Scalar"<<scalar<<std::endl;
@@ -320,8 +344,8 @@ void CSR<CIT, VT, RPT>::row_reduce()
 
 //Multiply each non zero value with a vector
 template <typename CIT, typename VT, typename RPT>
-template<typename T>
-void CSR<CIT, VT, RPT>::dimApply(pvector<T> &mul_vector)
+//template<typename T>
+void CSR<CIT, VT, RPT>::dimApply(pvector<int> &mul_vector)
 {
 	for(size_t i = 0; i < rowPtr_.size(); i++)
 	{

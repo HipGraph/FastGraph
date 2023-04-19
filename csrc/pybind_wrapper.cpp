@@ -37,8 +37,8 @@ void define_csr(py::module &m,std::string classname)
 	py::class_<CSR<CIT,VT,RPT>>(m, classname.c_str())
 		.def(py::init<COO<RIT,CIT,VT>&>())
 		.def("ewiseApply",&CSR<CIT,VT,RPT>::ewiseApply)
-		.def("row_reduce",&CSR<CIT,VT,RPT>::row_reduce);
-		//.def("dimApply",&CSR<CIT,VT,RPT>::dimApply);
+		.def("row_reduce",&CSR<CIT,VT,RPT>::row_reduce)
+		.def("dimApply",&CSR<CIT,VT,RPT>::dimApply);
 }
 
 PYBIND11_MODULE(csplib, m) {

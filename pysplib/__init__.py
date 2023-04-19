@@ -18,4 +18,6 @@ def test():
 	print("type e",type(e))
 	#e.ewiseApply(2)
 	e.row_reduce()
+	#dimapplyvector=[1,2,3,4]
+	#e.dimApply(dimapplyvector)
 	

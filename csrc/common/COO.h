@@ -221,23 +221,6 @@ void COO<RIT,CIT,VT>::BinByRow(pvector<RPT>& rowPtr,pvector<CIT>& colIdsBinned,p
     }
 
 }
-// void COO<RIT, CIT, VT>:: BinByRow(pvector<CPT>& rowPtr, pvector<RIT>& colIdsBinned, pvector<VT>& nzValsBinned)
-// {
-//     pvector<CPT> nnzPerRow = NnzPerRow();
-//     ParallelPrefixSum(nnzPerRow, rowPtr);
-//     pvector<RIT> curPtr(rowPtr.begin(), rowPtr.end());
-//     colIdsBinned.resize(nnz_);
-//     if(isWeighted_)
-//         nzValsBinned.resize(nnz_);
-// //#pragma omp parallel for
-//     for(size_t i=0; i<nnz_; i++)
-//     {
-//         size_t pos = fetch_and_add(curPtr[nzRows_[i]], 1);
-//         colIdsBinned[pos] = nzCols_[i];
-//         if(isWeighted_) nzValsBinned[pos] = nzVals_[i];
-//     }
-// }
-
 
 
 
