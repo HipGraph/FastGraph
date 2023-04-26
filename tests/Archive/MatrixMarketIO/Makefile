@@ -1,6 +1,6 @@
-SPLIB_HOME = ../../
+SPLIB_HOME = ../../../
 
-NIST_HOME = $(SPLIB_HOME)/include/NIST
+NIST_HOME = $(SPLIB_HOME)/csrc/common/NIST
 
 CC = g++ -fopenmp -fpermissive -std=c++11 -g -Og -mavx
 

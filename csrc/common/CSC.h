@@ -97,10 +97,14 @@ public:
 	void count_sort(pvector<std::pair<RIT, VT> >& all_elements, size_t expon); // added by abhishek
 	void sort_inside_column();
 
-	void print_all(); // added by abhishek
+	void csc_print_all(); // added by abhishek
     
 	// written by Shardul
 	void ewiseApply(VT scalar);
+
+	// written by Shardul
+	template <typename CIT>
+	COO<RIT,CIT,VT> csc_to_coo();
 
 
 	
@@ -383,7 +387,7 @@ void CSC<RIT, VT, CPT>::matAddition_2(CSC &b)
 
 	std::cout<<"Resultant Final matrix information"<<std::endl;
 	// c.PrintInfo();
-	c.print_all();
+	c.csc_print_all();
 }
 
 
@@ -546,11 +550,11 @@ size_t CSC<RIT, VT, CPT>:: get_nnz()
 }
 
 template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::print_all()
+void CSC<RIT, VT, CPT>::csc_print_all()
 {
-	//std::cout << "CSC matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl<<"column_pointer_array"<<std::endl;
-	std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
-	
+	std::cout << "CSC matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl;
+	//std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
+	std::cout<<"colptr"<<std::endl;
 	for(size_t i = 0; i < colPtr_.size(); i++){
 		std::cout<<colPtr_[i];
 		if(i != ncols_){
@@ -560,7 +564,7 @@ void CSC<RIT, VT, CPT>::print_all()
 		}
 	}
 	//std::cout<<std::endl;
-	//std::cout<<std::endl<<"row_correspondents"<<std::endl;
+	std::cout<<"row_correspondents"<<std::endl;
 	for(size_t i = 0; i < rowIds_.size(); i++){
 		std::cout<<rowIds_[i];
 		if(i != nnz_-1){
@@ -570,7 +574,7 @@ void CSC<RIT, VT, CPT>::print_all()
 		}
 	}
 	//std::cout<<std::endl;
-	//std::cout<<std::endl<<"nz_values"<<std::endl;
+	std::cout<<"nz_values"<<std::endl;
 	for(size_t i = 0; i < nzVals_.size(); i++){
 		std::cout<<nzVals_[i];
 		if(i != nnz_-1){
@@ -615,6 +619,7 @@ CSC<RIT, VT, CPT>::CSC(COO<RIT, CIT, VT> & cooMat)
 	nrows_ = cooMat.nrows();
 	ncols_ = cooMat.ncols();
 	nnz_ = cooMat.nnz();
+	
 	isWeighted_ = cooMat.isWeighted();
 	cooMat.BinByCol(colPtr_, rowIds_, nzVals_);
 	MergeDuplicateSort(std::plus<VT>());
@@ -623,6 +628,16 @@ CSC<RIT, VT, CPT>::CSC(COO<RIT, CIT, VT> & cooMat)
 	//PrintTime("CSC Creation Time", t.Seconds());
 }
 
+template <typename RIT, typename VT, typename CPT>
+template <typename CIT>
+COO<RIT, CIT, VT> CSC<RIT, VT, CPT>::csc_to_coo()
+{
+	COO<RIT,CIT,VT> coo_object();
+	coo_object.nrows_ = nrows_;
+	coo_object.ncols_ = ncols_;
+	coo_object.nnz_ = nnz_;
+
+}
 
 
 template <typename RIT, typename VT, typename CPT>

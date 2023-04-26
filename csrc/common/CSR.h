@@ -53,9 +53,9 @@ public:
 	template <typename RIT>
 	CSR(COO<RIT, CIT, VT> & cooMat);
 
-	//written by Shardul
-	template <typename CPT,typename RIT>
-	CSR(CSC<RIT,VT,CPT> & cscMat);
+	// //written by Shardul
+	// template <typename CPT,typename RIT>
+	// CSR(CSC<RIT,VT,CPT> & cscMat);
 	
 	template <typename AddOp>
 	void MergeDuplicateSort(AddOp binop);
@@ -187,34 +187,34 @@ size_t CSR<RIT, VT, RPT>:: get_nnz()
 template <typename RIT, typename VT, typename RPT>
 void CSR<RIT, VT, RPT>::print_all()
 {
-	//std::cout << "CSR matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl<<"column_pointer_array"<<std::endl;
-	std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
-	
+	std::cout << "CSR matrix: " << " Rows= " << nrows_  << " Columns= " << ncols_ << " nnz= " << nnz_ << std::endl;
+	//std::cout<< nrows_<<" "<<ncols_<<" "<<nnz_<<std::endl;
+	std::cout<<"colIds"<<std::endl;
 	for(size_t i = 0; i < colIds_.size(); i++){
-		std::cout<<colIds_[i];
-		if(i != ncols_){
-			std::cout<<" ";
-		}else{
-			std::cout<<std::endl;
-		}
+		std::cout<<colIds_[i]<<std::endl;
+		// if(i != nnz_-1){
+		// 	std::cout<<" ";
+		// }else{
+		// 	std::cout<<std::endl;
+		// }
 	}
-	
+	std::cout<<"rowPtr"<<std::endl;
 	for(size_t i = 0; i < rowPtr_.size(); i++){
-		std::cout<<rowPtr_[i];
-		if(i != nnz_-1){
-			std::cout<<" ";
-		}else{
-			std::cout<<std::endl;
-		}
+		std::cout<<rowPtr_[i]<<std::endl;
+		// if(i != nrows_){
+		// 	std::cout<<" ";
+		// }else{
+		// 	std::cout<<std::endl;
+		// }
 	}
-	
+	std::cout<<"nonzero values"<<std::endl;
 	for(size_t i = 0; i < nzVals_.size(); i++){
-		std::cout<<nzVals_[i];
-		if(i != nnz_-1){
-			std::cout<<" ";
-		}else{
-			std::cout<<std::endl;
-		}
+		std::cout<<nzVals_[i]<<std::endl;
+		// if(i != nnz_-1){
+		// 	std::cout<<" ";
+		// }else{
+		// 	std::cout<<std::endl;
+		// }
 	}
 	
 
@@ -260,22 +260,22 @@ CSR<CIT, VT, RPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 }
 
 
-template <typename CIT, typename VT, typename RPT>
-template <typename CPT,typename RIT>
-CSR<CIT, VT, RPT>::CSR(CSC<RIT,VT,CPT> & cscMat)
-{
-	cscMat.ncols_=
-	// Timer t;
-	// t.Start();
-	// nrows_ = cooMat.nrows();
-	// ncols_ = cooMat.ncols();
-	// nnz_ = cooMat.nnz();
-	// isWeighted_ = cooMat.isWeighted();
-	// cooMat.BinByRow(rowPtr_, colIds_, nzVals_);
-	// MergeDuplicateSort(std::plus<VT>());
-	// isRowSorted_ = true;
-	// t.Stop();
-}
+// template <typename CIT, typename VT, typename RPT>
+// template <typename CPT,typename RIT>
+// CSR<CIT, VT, RPT>::CSR(CSC<RIT,VT,CPT> & cscMat)
+// {
+// 	//cscMat.ncols_=
+// 	// Timer t;
+// 	// t.Start();
+// 	// nrows_ = cooMat.nrows();
+// 	// ncols_ = cooMat.ncols();
+// 	// nnz_ = cooMat.nnz();
+// 	// isWeighted_ = cooMat.isWeighted();
+// 	// cooMat.BinByRow(rowPtr_, colIds_, nzVals_);
+// 	// MergeDuplicateSort(std::plus<VT>());
+// 	// isRowSorted_ = true;
+// 	// t.Stop();
+// }
 
 
 

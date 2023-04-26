@@ -16,7 +16,8 @@ void define_coo(py::module &m, std::string classname)
 		.def(py::init<>())
 		.def("GenER", static_cast<void (COO<RIT,CIT,VT>::*)(int,int,bool,int64_t)>(&COO<RIT,CIT,VT>::GenER), "GenER")
 		.def("GenER", static_cast<void (COO<RIT,CIT,VT>::*)(int,int,int,bool,int64_t)>(&COO<RIT,CIT,VT>::GenER), "GenER")
-		.def("PrintInfo",&COO<RIT,CIT,VT>::PrintInfo);
+		.def("PrintInfo",&COO<RIT,CIT,VT>::PrintInfo)
+		.def("print_all",&COO<RIT,CIT,VT>::print_all);
 }
 
 
@@ -26,7 +27,9 @@ void define_csc(py::module &m, std::string classname)
 	py::class_<CSC<RIT,VT,CPT>>(m, classname.c_str())
 		.def(py::init<COO<RIT,CIT,VT>&>())
 		.def("column_reduce",&CSC<RIT,VT,CPT>::column_reduce)
-		.def("ewiseApply",&CSC<RIT,VT,CPT>::ewiseApply);
+		.def("ewiseApply",&CSC<RIT,VT,CPT>::ewiseApply)
+		.def("csc_print_all",&CSC<RIT,VT,CPT>::csc_print_all);
+
 		
 }
 
@@ -38,6 +41,7 @@ void define_csr(py::module &m,std::string classname)
 		.def(py::init<COO<RIT,CIT,VT>&>())
 		.def("ewiseApply",&CSR<CIT,VT,RPT>::ewiseApply)
 		.def("row_reduce",&CSR<CIT,VT,RPT>::row_reduce)
+		.def("PrintInfo",&CSR<CIT,VT,RPT>::PrintInfo)
 		.def("dimApply",&CSR<CIT,VT,RPT>::dimApply);
 }
 
