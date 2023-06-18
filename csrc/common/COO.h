@@ -102,8 +102,8 @@ public:
     template<typename CPT>
     void BinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinned, pvector<VT>& nzValsBinned);
 
-    template<typename CPT>
-    void reverseBinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinned, pvector<VT>& nzValsBinned);
+    // template<typename CPT>
+    // void reverseBinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinned, pvector<VT>& nzValsBinned);
 
     template<typename RPT>
     void BinByRow(pvector<RPT>& rowPtr, pvector<CIT>& rowIdsBinned, pvector<VT>& nzValsBinned);
@@ -205,24 +205,24 @@ void COO<RIT, CIT, VT>:: BinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinn
 
 
 
-template <typename RIT, typename CIT, typename VT>
-template<typename CPT>
-void COO<RIT, CIT, VT>:: reverseBinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinned, pvector<VT>& nzValsBinned)
-{
-    pvector<RIT> nnzPerCol = NnzPerCol();
-    ParallelPrefixSum(nnzPerCol, colPtr);
-    pvector<CPT> curPtr(colPtr.begin(), colPtr.end());
-    rowIdsBinned.resize(nnz_);
-    if(isWeighted_)
-        nzValsBinned.resize(nnz_);
-//#pragma omp parallel for
-    for(size_t i=0; i<nnz_; i++)
-    {
-        size_t pos = fetch_and_add(curPtr[nzCols_[i]], 1);
-        rowIdsBinned[pos] = nzRows_[i];
-        if(isWeighted_) nzValsBinned[pos] = nzVals_[i];
-    }
-}
+// template <typename RIT, typename CIT, typename VT>
+// template<typename CPT>
+// void COO<RIT, CIT, VT>:: reverseBinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinned, pvector<VT>& nzValsBinned)
+// {
+//     pvector<RIT> nnzPerCol = NnzPerCol();
+//     ParallelPrefixSum(nnzPerCol, colPtr);
+//     pvector<CPT> curPtr(colPtr.begin(), colPtr.end());
+//     rowIdsBinned.resize(nnz_);
+//     if(isWeighted_)
+//         nzValsBinned.resize(nnz_);
+// //#pragma omp parallel for
+//     for(size_t i=0; i<nnz_; i++)
+//     {
+//         size_t pos = fetch_and_add(curPtr[nzCols_[i]], 1);
+//         rowIdsBinned[pos] = nzRows_[i];
+//         if(isWeighted_) nzValsBinned[pos] = nzVals_[i];
+//     }
+// }
 
 
 

@@ -38,6 +38,8 @@ int main(int argc, char* argv[]){
     std::cout<<"CSR!!!!!!!!!!!!!!!!!!!!!!"<<std::endl;
     csr.print_all();
 
+
+
     // std::cout<<"Mat Addition here..."<<std::endl;
     
     // auto start = high_resolution_clock::now();
