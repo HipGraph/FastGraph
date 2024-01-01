@@ -34,7 +34,9 @@ class COO
 public:
     COO(): nrows_(0), ncols_(0), nnz_(0), sortType_(UNSORTED) {}
     COO(RIT nrows, CIT ncols, size_t nnz, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), sortType_(UNSORTED), isWeighted_(isWeighted) {
-        nzRows_.resize(nnz); nzCols_.resize(nnz); nzVals_.resize(nnz);} // uncommented by abhishek
+        nzRows_.resize(nnz); nzCols_.resize(nnz); nzVals_.resize(nnz);
+    }
+    // MTH: Need a copy constructor
 
 
     //------------------------------------------------
