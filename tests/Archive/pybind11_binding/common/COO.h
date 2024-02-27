@@ -1,18 +1,23 @@
+//
+//  COO.h
+//
+//
+
+#ifndef COO_h
+#define COO_h
+
 #include <algorithm>
 #include <iostream>
 #include <cinttypes>
 #include <random>
 #include "omp.h"
-//#include "../include/defs.h"
-//#include "../common/defs.h"
-#include "common/defs.h"
-#include "common/utils.h"
-#include "common/GAP/timer.h"
-#include "common/GAP/util.h"
-#include "common/GAP/pvector.h"
-#include "common/GAP/platform_atomics.h"
-#include "common/NIST/mmio.h"
-
+#include "defs.h"
+#include "utils.h"
+#include "GAP/timer.h"
+#include "GAP/util.h"
+#include "GAP/pvector.h"
+#include "GAP/platform_atomics.h"
+#include "NIST/mmio.h"
 
 
 // RIT: Row Index Type
@@ -29,7 +34,9 @@ class COO
 public:
     COO(): nrows_(0), ncols_(0), nnz_(0), sortType_(UNSORTED) {}
     COO(RIT nrows, CIT ncols, size_t nnz, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), sortType_(UNSORTED), isWeighted_(isWeighted) {
-        nzRows_.resize(nnz); nzCols_.resize(nnz); nzVals_.resize(nnz);} // uncommented by abhishek
+        nzRows_.resize(nnz); nzCols_.resize(nnz); nzVals_.resize(nnz);
+    }
+    // MTH: Need a copy constructor
 
 
     //------------------------------------------------
@@ -454,3 +461,6 @@ void COO<RIT, CIT, VT>::GenRMAT(int scale, int d, bool isWeighted, int64_t kRand
 }
 
 
+
+
+#endif /* COO_h */

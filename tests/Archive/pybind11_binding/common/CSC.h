@@ -1,3 +1,6 @@
+#ifndef _CSC_H_
+#define _CSC_H_
+
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
@@ -7,14 +10,15 @@
 #include <vector>
 
 
-// #include "common/COO.h"
-#include "common/utils.h"
-#include "common/GAP/timer.h"
-#include "common/GAP/util.h"
-#include "common/GAP/pvector.h"
-#include "common/GAP/platform_atomics.h"
+#include "COO.h"
+#include "utils.h"
+#include "GAP/timer.h"
+#include "GAP/util.h"
+#include "GAP/pvector.h"
+#include "GAP/platform_atomics.h"
 
 #include <numeric>
+//#include "gtest/gtest.h"
 
 
 
@@ -38,12 +42,12 @@ class CSC
 public:
 	CSC(): nrows_(0), ncols_(0), nnz_(0), isColSorted_(false) {}
 
-	// CSC(RIT nrows, size_t ncols, size_t nnz,bool col_sort_bool, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), isColSorted_(col_sort_bool), isWeighted_(isWeighted) 
-    // {
-	// 	rowIds_.resize(nnz); 
-    //     colPtr_.resize(ncols+1); 
-    //     nzVals_.resize(nnz);
-    // }  // added by abhishek
+	CSC(RIT nrows, size_t ncols, size_t nnz,bool col_sort_bool, bool isWeighted): nrows_(nrows), ncols_(ncols), nnz_(nnz), isColSorted_(col_sort_bool), isWeighted_(isWeighted) 
+    {
+		rowIds_.resize(nnz); 
+        colPtr_.resize(ncols+1); 
+        nzVals_.resize(nnz);
+    }  // added by abhishek
 
 	template <typename CIT>
 	CSC(COO<RIT, CIT, VT> & cooMat);
@@ -58,26 +62,26 @@ public:
     
     const CPT get_colPtr(size_t idx);
 
-	// CSC<RIT, VT, CPT>(CSC<RIT, VT, CPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isColSorted_(other.isColSorted_)   // added by abhishek
-	// {
-	// 	rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
-	// 	colPtr_ = std::move(other.colPtr_);
-	// 	rowIds_ = std::move(other.rowIds_);
-	// 	nzVals_ = std::move(other.nzVals_);
-	// }
+	CSC<RIT, VT, CPT>(CSC<RIT, VT, CPT> &&other): nrows_(other.nrows_),ncols_(other.ncols_),nnz_(other.nnz_),isWeighted_(other.isWeighted_),isColSorted_(other.isColSorted_)   // added by abhishek
+	{
+		rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
+		colPtr_ = std::move(other.colPtr_);
+		rowIds_ = std::move(other.rowIds_);
+		nzVals_ = std::move(other.nzVals_);
+	}
 
-	// CSC<RIT, VT, CPT>& operator= (CSC<RIT, VT, CPT> && other){ // added by abhishek
-	// 	nrows_ = other.nrows_;
-	// 	ncols_ = other.ncols_;
-	// 	nnz_ = other.nnz_;
-	// 	isWeighted_ = other.isWeighted_;
-	// 	isColSorted_ = other.isColSorted_;
-	// 	rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
-	// 	colPtr_ = std::move(other.colPtr_);
-	// 	rowIds_ = std::move(other.rowIds_);
-	// 	nzVals_ = std::move(other.nzVals_);
-	// 	return *this;
-	// }
+	CSC<RIT, VT, CPT>& operator= (CSC<RIT, VT, CPT> && other){ // added by abhishek
+		nrows_ = other.nrows_;
+		ncols_ = other.ncols_;
+		nnz_ = other.nnz_;
+		isWeighted_ = other.isWeighted_;
+		isColSorted_ = other.isColSorted_;
+		rowIds_.resize(nnz_); colPtr_.resize(ncols_+1); nzVals_.resize(nnz_);
+		colPtr_ = std::move(other.colPtr_);
+		rowIds_ = std::move(other.rowIds_);
+		nzVals_ = std::move(other.nzVals_);
+		return *this;
+	}
     
     bool operator== (const CSC<RIT, VT, CPT> & other);
 
@@ -109,18 +113,8 @@ public:
 	//template <typename T>
 	void column_reduce();
 
-	template <typename T>
+    template <typename T>
 	pvector<T> column_reduce_1();
-
-	
-	void matAddition(CSC &b);
-
-	void matAddition_1(CSC &b);
-
-	void matAddition_2(CSC &b);
-
-	void matAddition_3(CSC &b);
-
 
     void column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int nsplit);
 private:
@@ -244,243 +238,6 @@ pvector<T> CSC<RIT, VT, CPT>::column_reduce_1()
 	return result_vector;
 }
 
-
-template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::matAddition_2(CSC &b)
-{
-	pvector<CPT> c_colPtr_;
-	
-	c_colPtr_.resize(ncols_+1);
-	for (size_t index_for_initialization = 0; index_for_initialization < ncols_+1; index_for_initialization++)
-	{
-		c_colPtr_[index_for_initialization]=0;
-	}
-	size_t i,j,k,m;
-	for(i = 0; i < ncols_; i++)
-	{
-		for(j=colPtr_[i],k=b.colPtr_[i];j<colPtr_[i+1] && k<b.colPtr_[i+1];)
-		{
-			if(rowIds_[j]==b.rowIds_[k])
-			{
-				c_colPtr_[i+1]++;
-				j++;
-				k++;
-			}
-			else if(rowIds_[j]<b.rowIds_[k])
-			{
-				c_colPtr_[i+1]++;
-				j++;
-			}
-			else
-			{
-				c_colPtr_[i+1]++;
-				k++;
-			}
-		}
-	}
-	while (j<colPtr_[i+1]) 
-	{
-    	c_colPtr_[i+1]++;
-		j++;
-  	}
-	while (k<colPtr_[i+1]) 
-	{
-    	c_colPtr_[i+1]++;
-		k++;
-  	}
-	// std::cout<<"Before"<<std::endl;
-	// for (size_t index_prefix_sum = 0; index_prefix_sum < c_colPtr_.size(); index_prefix_sum++)
-	// {
-	// 	std::cout<<c_colPtr_[index_prefix_sum]<<std::endl;
-	// }
-	std::cout<<"Colptr vector for c is set here"<<std::endl;
-	for (size_t index_prefix_sum = 1; index_prefix_sum < c_colPtr_.size(); index_prefix_sum++)
-	{
-		c_colPtr_[index_prefix_sum]=c_colPtr_[index_prefix_sum]+c_colPtr_[index_prefix_sum-1];
-	}
-	// std::cout<<"After"<<std::endl;
-	// for (size_t index_prefix_sum = 0; index_prefix_sum < c_colPtr_.size(); index_prefix_sum++)
-	// {
-	// 	std::cout<<c_colPtr_[index_prefix_sum]<<std::endl;
-	// }
-	
-	
-	size_t resizing_value=c_colPtr_[c_colPtr_.size()-1];
-	std::cout<<"Number of non zeroes here:"<<std::endl;
-	std::cout<<resizing_value<<std::endl;
-
-	pvector<RIT> c_rowIds_(resizing_value);
-	pvector<VT> c_nzVals_(resizing_value);
-	
-	for(i = 0; i < ncols_; i++)
-	{
-		for(j=colPtr_[i],k=b.colPtr_[i],m=c_colPtr_[i];j<colPtr_[i+1] && k<b.colPtr_[i+1] && m<c_colPtr_[i+1];)
-		{
-			if(rowIds_[j]==b.rowIds_[k])
-			{
-				c_nzVals_[m]=nzVals_[j]+b.nzVals_[k];
-				c_rowIds_[m]=rowIds_[j];
-				j++;
-				k++;
-				m++;
-
-			}
-			else if(rowIds_[j]<b.rowIds_[k])
-			{
-				c_nzVals_[m]=nzVals_[j];
-				c_rowIds_[m]=rowIds_[j];
-				j++;
-				m++;
-
-			}
-			else
-			{
-				c_nzVals_[m]=b.nzVals_[k];
-				c_rowIds_[m]=b.rowIds_[k];
-				k++;
-				m++;
-
-			}
-
-		}
-	}
-
-
-	size_t c_nnz= c_nzVals_.size();
-	CSC c(nrows_, ncols_,c_nnz,false,false);
-
-	for (size_t i=0; i<c_colPtr_.size(); i++)
-	{
-		c.colPtr_.push_back(c_colPtr_[i]);
-	}
-	
-	for (size_t i=0; i<c_rowIds_.size(); i++)
-	{
-		c.rowIds_.push_back(c_rowIds_[i]);
-	}
-
-	for (size_t i=0; i<c_nzVals_.size(); i++)
-	{
-		c.nzVals_.push_back(c_nzVals_[i]);
-	}
-
-	std::cout<<"Resultant Final matrix information"<<std::endl;
-	// c.PrintInfo();
-	c.print_all();
-}
-
-
-
-
-template <typename RIT, typename VT, typename CPT>
-void CSC<RIT, VT, CPT>::matAddition_3(CSC &b)
-{
-	pvector<CPT> c_colPtr_;
-	pvector<RIT> c_rowIds_;
-	pvector<VT> c_nzVals_;
-	c_colPtr_.resize(ncols_+1);
-	for (size_t index_for_initialization = 0; index_for_initialization < ncols_; index_for_initialization++)
-	{
-		/* code */
-		c_colPtr_[index_for_initialization]=0;
-	}
-	size_t i,j,k,m;
-	for(i = 0; i < ncols_; i++)
-	{
-		for(j=colPtr_[i],k=b.colPtr_[i];j<colPtr_[i+1] && k<b.colPtr_[i+1];)
-		{
-			if(rowIds_[j]==b.rowIds_[k])
-			{
-				c_colPtr_[i+1]++;
-				j++;
-				k++;
-			}
-			else if(rowIds_[j]<b.rowIds_[k])
-			{
-				c_colPtr_[i+1]++;
-				j++;
-			}
-			else
-			{
-				c_colPtr_[i+1]++;
-				k++;
-			}
-		}
-	}
-	while (j<colPtr_[i+1]) 
-	{
-    	c_colPtr_[i+1]++;
-		j++;
-  	}
-	while (k<colPtr_[i+1]) 
-	{
-    	c_colPtr_[i+1]++;
-		k++;
-  	}
-	for (size_t index_prefix_sum = 1; index_prefix_sum < c_colPtr_.size(); index_prefix_sum++)
-	{
-		c_colPtr_[index_prefix_sum]=c_colPtr_[index_prefix_sum]+c_colPtr_[index_prefix_sum-1];
-	}
-	
-	std::cout<<"HEYYYY"<<std::endl;
-
-	size_t resizing_value=c_colPtr_[c_colPtr_.size()-1];
-	//std::cout<<resizing_value<<std::endl;
-	c_rowIds_.resize(resizing_value);
-	c_nzVals_.resize(resizing_value);
-
-	for(i = 0; i < ncols_; i++)
-	{
-		for(j=colPtr_[i],k=b.colPtr_[i],m=c_colPtr_[i];j<colPtr_[i+1] && k<b.colPtr_[i+1] && m<c_colPtr_[i+1];)
-		{
-			if(rowIds_[j]==b.rowIds_[k])
-			{
-				c_nzVals_[m]=nzVals_[j]+b.nzVals_[k];
-				c_rowIds_[m]=rowIds_[j];
-				j++;
-				k++;
-				m++;
-
-			}
-			else if(rowIds_[j]<b.rowIds_[k])
-			{
-				c_nzVals_[m]=nzVals_[j];
-				c_rowIds_[m]=rowIds_[j];
-				j++;
-				m++;
-
-			}
-			else
-			{
-				c_nzVals_[m]=b.nzVals_[k];
-				c_rowIds_[m]=b.rowIds_[k];
-				k++;
-				m++;
-
-			}
-
-		}
-	}
-
-	size_t c_nnz= c_nzVals_.size();
-	CSC c(nrows_, ncols_,c_nnz,false,false);
-
-	for (size_t i=0; i<c_colPtr_.size(); i++)
-	{
-		c.colPtr_.push_back(c_colPtr_[i]);
-	}
-	
-	for (size_t i=0; i<c_rowIds_.size(); i++)
-	{
-		c.rowIds_.push_back(c_rowIds_[i]);
-	}
-
-	for (size_t i=0; i<c_nzVals_.size(); i++)
-	{
-		c.nzVals_.push_back(c_nzVals_[i]);
-	}
-	c.PrintInfo();
-}
 
 template <typename RIT, typename VT, typename CPT>
 const pvector<CPT>* CSC<RIT, VT, CPT>::get_colPtr()
@@ -798,3 +555,4 @@ void CSC<RIT, VT, CPT>::column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int
 }
 
 
+#endif
