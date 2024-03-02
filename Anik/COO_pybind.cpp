@@ -43,23 +43,23 @@ void define_coo(py::module &m, std::string classname)
 				py::capsule(M.get_val_vector().data(), [](void *p){ /* Numpy will manage this memory */ })
 			);
 		})
-		.def("update_row_pvector", [](COO<RIT,CIT,VT> &M, py::array_t<RIT> np_array) {
+		.def("update_row_pvector", [](COO<RIT,CIT,VT> &M, py::array_t<RIT> np_array, bool transfer_ownership) {
 			py::buffer_info buf = np_array.request();
 			RIT *ptr = static_cast<RIT *>(buf.ptr);
 			size_t sz = buf.size;
-			M.update_row_pvector(ptr, sz);
+			M.update_row_pvector(ptr, sz, transfer_ownership);
 		})
-		.def("update_col_pvector", [](COO<RIT,CIT,VT> &M, py::array_t<CIT> np_array) {
+		.def("update_col_pvector", [](COO<RIT,CIT,VT> &M, py::array_t<CIT> np_array, bool transfer_ownership) {
 			py::buffer_info buf = np_array.request();
 			CIT *ptr = static_cast<CIT *>(buf.ptr);
 			size_t sz = buf.size;
-			M.update_col_pvector(ptr, sz);
+			M.update_col_pvector(ptr, sz, transfer_ownership);
 		})
-		.def("update_val_pvector", [](COO<RIT,CIT,VT> &M, py::array_t<VT> np_array) {
+		.def("update_val_pvector", [](COO<RIT,CIT,VT> &M, py::array_t<VT> np_array, bool transfer_ownership) {
 			py::buffer_info buf = np_array.request();
 			VT *ptr = static_cast<VT *>(buf.ptr);
 			size_t sz = buf.size;
-			M.update_val_pvector(ptr, sz);
+			M.update_val_pvector(ptr, sz, transfer_ownership);
 		})
 		.def("PrintInfo",&COO<RIT,CIT,VT>::PrintInfo);
 	

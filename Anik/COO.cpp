@@ -108,9 +108,9 @@ public:
     void nz_cols_pvector(pvector<CIT>* column_pointer) {nzCols_ = std::move((*column_pointer));}
     void nz_vals_pvector(pvector<VT>* value_pointer) {nzVals_ = std::move((* value_pointer));}
     
-    void update_row_pvector(RIT * ptr, size_t sz) { nrows_ = sz; nzRows_.update_pvector(ptr, sz);}
-    void update_col_pvector(RIT * ptr, size_t sz) { ncols_ = sz; nzCols_.update_pvector(ptr, sz);}
-    void update_val_pvector(VT * ptr, size_t sz) { nnz_ = sz; nzVals_.update_pvector(ptr, sz);}
+    void update_row_pvector(RIT * ptr, size_t sz, bool owner_=false) { nrows_ = sz; nzRows_.update_pvector(ptr, sz, owner_);}
+    void update_col_pvector(RIT * ptr, size_t sz, bool owner_=false) { ncols_ = sz; nzCols_.update_pvector(ptr, sz, owner_);}
+    void update_val_pvector(VT * ptr, size_t sz, bool owner_=false) { nnz_ = sz; nzVals_.update_pvector(ptr, sz, owner_);}
 
     void print_all(); // added by abhishek
 

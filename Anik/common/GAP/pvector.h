@@ -32,13 +32,15 @@ class pvector {
     end_capacity_ = end_size_;
   }
 
-  void update_pvector(T_ * ptr, size_t num_elements){
+  // [Anik] Receive a pointer and update the object. Most probably not owner of the memory
+  void update_pvector(T_ * ptr, size_t num_elements, bool owner_=false){
     if (start_ != nullptr){
-      std::cout<< "Warning! Previous pvector was not empty. Possible memory leak!\n";
+      std::cout<< "Warning! Previous pvector was not empty. Possible memory leak! Should call this function from empty pvector only.\n";
     }
     start_ = ptr;
     end_size_ = start_ + num_elements;
     end_capacity_ = end_size_;
+    owner = owner_;
   }
   
 
@@ -78,8 +80,10 @@ class pvector {
 
   ~pvector() {
     if (start_ != nullptr){
-      // std::cout << "deleting from pvector.h\n";
-      delete[] start_;
+      if (owner){
+        delete[] start_;
+        // std::cout << "deleting from pvector.h\n";
+      }
     }
       
   }
@@ -165,6 +169,7 @@ class pvector {
   T_* start_;
   T_* end_size_;
   T_* end_capacity_;
+  bool owner = true; // [Anik] Does the object own the memory? If we are creating an object with a pointer only, we need to set it as False so that the destructor does not delete it
   static const size_t growth_factor = 2;
 };
 
