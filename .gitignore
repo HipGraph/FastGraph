@@ -14,4 +14,4 @@ mkl-tree
 build/
 pysplib.egg-info/
 pysplib/__pycache__/
-pysplib/*.so
+*.so

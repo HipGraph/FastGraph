@@ -175,8 +175,6 @@ pvector<RIT> COO<RIT, CIT, VT>:: NnzPerCol()
     return nnzPerCol;
 }
 
-
-
 // Bin by column
 // Populate CSC-style data structures
 // TODO: use propagation blocking for binning

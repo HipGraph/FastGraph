@@ -3,6 +3,8 @@ from .csplib import CSC_double
 
 def test():
 	c=COO_int()
+	c.PrintInfo()
+
 	c.GenER(2,2,True,1)
 
 	c.PrintInfo()

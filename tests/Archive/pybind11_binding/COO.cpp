@@ -43,6 +43,8 @@ public:
     RIT NzRows (size_t i) const { return nzRows_[i]; }
     CIT NzCols (size_t i) const { return nzCols_[i]; }
     VT NzVals (size_t i) const { return nzVals_[i]; }
+
+
     
     size_t nrows() const {return nrows_;}
     size_t ncols() const {return ncols_;}
@@ -97,11 +99,19 @@ public:
     template<typename CPT>
     void BinByCol(pvector<CPT>& colPtr, pvector<RIT>& rowIdsBinned, pvector<VT>& nzValsBinned);
 
+    pvector<RIT>& get_row_vector() {return nzRows_;}
+    pvector<CIT>& get_col_vector() {return nzCols_;}
+    pvector<VT>& get_val_vector() {return nzVals_;}
+    
 
     void nz_rows_pvector(pvector<RIT>* row_pointer) { nzRows_ = std::move((*row_pointer));} // added by abhishek
     void nz_cols_pvector(pvector<CIT>* column_pointer) {nzCols_ = std::move((*column_pointer));}
     void nz_vals_pvector(pvector<VT>* value_pointer) {nzVals_ = std::move((* value_pointer));}
     
+    void update_row_pvector(RIT * ptr, size_t sz) { nrows_ = sz; nzRows_.update_pvector(ptr, sz);}
+    void update_col_pvector(RIT * ptr, size_t sz) { ncols_ = sz; nzCols_.update_pvector(ptr, sz);}
+    void update_val_pvector(VT * ptr, size_t sz) { nnz_ = sz; nzVals_.update_pvector(ptr, sz);}
+
     void print_all(); // added by abhishek
 
     
@@ -223,7 +233,7 @@ void COO<RIT, CIT, VT>::GenER(int rowscale, int colscale, int d, bool isWeighted
     std::mt19937 rng;
     rng.seed(kRandSeed);
     std::vector<size_t> randSeeds(nthreads);
-    for (int t = 0; t < nthreads; t++) randSeeds[t] = rng();
+    for (size_t t = 0; t < nthreads; t++) randSeeds[t] = rng();
     
     if(isWeighted_) nzVals_.resize(nnz_);
 #pragma omp parallel
@@ -284,7 +294,7 @@ void COO<RIT, CIT, VT>::GenER(int scale, int d, bool isWeighted, int64_t kRandSe
     std::mt19937 rng;
     rng.seed(kRandSeed);
     std::vector<size_t> randSeeds(nthreads);
-    for (int t = 0; t < nthreads; t++) randSeeds[t] = rng();
+    for (size_t t = 0; t < nthreads; t++) randSeeds[t] = rng();
     
     if(isWeighted_) nzVals_.resize(nnz_);
 #pragma omp parallel
@@ -394,7 +404,7 @@ void COO<RIT, CIT, VT>::GenRMAT(int scale, int d, bool isWeighted, int64_t kRand
     std::mt19937 rng;
     rng.seed(kRandSeed);
     std::vector<size_t> randSeeds(nthreads);
-    for (int t = 0; t < nthreads; t++) randSeeds[t] = rng();
+    for (size_t t = 0; t < nthreads; t++) randSeeds[t] = rng();
 
 #pragma omp parallel
     {

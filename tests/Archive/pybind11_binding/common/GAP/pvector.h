@@ -32,6 +32,16 @@ class pvector {
     end_capacity_ = end_size_;
   }
 
+  void update_pvector(T_ * ptr, size_t num_elements){
+    if (start_ != nullptr){
+      std::cout<< "Warning! Previous pvector was not empty. Possible memory leak!\n";
+    }
+    start_ = ptr;
+    end_size_ = start_ + num_elements;
+    end_capacity_ = end_size_;
+  }
+  
+
   pvector(size_t num_elements, T_ init_val) : pvector(num_elements) {
     fill(init_val);
   }
@@ -67,8 +77,11 @@ class pvector {
   }
 
   ~pvector() {
-    if (start_ != nullptr)
+    if (start_ != nullptr){
+      // std::cout << "deleting from pvector.h\n";
       delete[] start_;
+    }
+      
   }
 
   // not thread-safe
