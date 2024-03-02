@@ -11,3 +11,7 @@ pairwise-tree-dynamic
 pairwise-tree-static
 mkl-serial
 mkl-tree
+build/
+pysplib.egg-info/
+pysplib/__pycache__/
+*.so

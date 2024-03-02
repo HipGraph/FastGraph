@@ -1,0 +1,224 @@
+Filename: /nfs/nfs2/home/mdshoque/projects/splib/SpLib/tests/Archive/pybind11_binding/test.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+     9     62.3 MiB     62.3 MiB           1   @profile(stream=mem_logs)
+    10                                         def run_test():
+    11     62.3 MiB      0.0 MiB           1       c=COO_double()
+    12     62.3 MiB      0.0 MiB           1       c.PrintInfo()
+    13     62.3 MiB      0.0 MiB           1       print((c.get_row_count(), c.get_col_count()))
+    14                                         
+    15     62.3 MiB      0.0 MiB           1       c.GenER(2,2,True,1)
+    16     62.3 MiB      0.0 MiB           1       c.PrintInfo()
+    17                                         
+    18                                             # x = np.asarray(memoryview(c.get_row_ptr()))
+    19                                             # x = np.ctypeslib.as_array(c.get_row_ptr())
+    20                                             # x = np.array(c.get_row_ptr(), copy=False)
+    21                                         
+    22                                         
+    23     62.3 MiB      0.0 MiB           1       m1_row = np.array(c.get_row_ptr(), copy=False)
+    24     62.3 MiB      0.0 MiB           1       m1_col = np.array(c.get_col_ptr(), copy=False)
+    25     62.3 MiB      0.0 MiB           1       m1_val = np.array(c.get_val_ptr(), copy=False)
+    26                                             # print(m1_row)
+    27                                             # print(m1_col)
+    28                                             # print(m1_val)
+    29                                         
+    30                                             # print((c.get_row_count(), c.get_col_count()))
+    31     62.7 MiB      0.4 MiB           1       mat = coo_matrix((m1_val, (m1_row, m1_col)), shape=(c.get_row_count(), c.get_col_count()))
+    32                                         
+    33                                         
+    34     62.7 MiB      0.0 MiB           1       G = nx.from_scipy_sparse_array(mat, create_using=nx.DiGraph)
+    35     62.7 MiB      0.0 MiB           1       print(G)
+    36                                         
+    37                                         
+    38                                             # print(len(x))
+    39                                             # x = np.frombuffer(c.get_row_ptr(), dtype=np.int32, count=4)
+    40                                             # del c
+    41                                         
+    42                                             # print(x)
+    43                                         
+    44                                         
+    45     62.7 MiB      0.0 MiB           1       d=CSC_double(c)
+    46                                             #d=CSC_double()
+    47     62.7 MiB      0.0 MiB           1       print(type(c))
+    48                                             # print(type(d))
+    49     62.7 MiB      0.0 MiB           1       print(type(d))
+    50     62.7 MiB      0.0 MiB           1       d.column_reduce()
+    51                                             #d(c)
+    52                                             #CSC_double(c)
+    53                                             #d(c)
+    54                                             #d=CSC_double(c)
+    55                                             #d=CSC_double(c<int32_t,double,int32_t>)
+    56                                         
+    57                                         
+    58                                             #d=CSC(c)
+
+
+Filename: /nfs/nfs2/home/mdshoque/projects/splib/SpLib/tests/Archive/pybind11_binding/test.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+     9     61.9 MiB     61.9 MiB           1   @profile(stream=mem_logs)
+    10                                         def run_test():
+    11     61.9 MiB      0.0 MiB           1       c=COO_double()
+    12     61.9 MiB      0.0 MiB           1       c.PrintInfo()
+    13     61.9 MiB      0.0 MiB           1       print((c.get_row_count(), c.get_col_count()))
+    14                                         
+    15     61.9 MiB      0.0 MiB           1       c.GenER(2,2,True,1)
+    16     61.9 MiB      0.0 MiB           1       c.PrintInfo()
+    17                                         
+    18                                             # x = np.asarray(memoryview(c.get_row_ptr()))
+    19                                             # x = np.ctypeslib.as_array(c.get_row_ptr())
+    20                                             # x = np.array(c.get_row_ptr(), copy=False)
+    21                                         
+    22                                         
+    23     61.9 MiB      0.0 MiB           1       m1_row = np.array(c.get_row_ptr(), copy=True)
+    24     61.9 MiB      0.0 MiB           1       m1_col = np.array(c.get_col_ptr(), copy=True)
+    25     61.9 MiB      0.0 MiB           1       m1_val = np.array(c.get_val_ptr(), copy=True)
+    26                                             # print(m1_row)
+    27                                             # print(m1_col)
+    28                                             # print(m1_val)
+    29                                         
+    30                                             # print((c.get_row_count(), c.get_col_count()))
+    31     62.2 MiB      0.3 MiB           1       mat = coo_matrix((m1_val, (m1_row, m1_col)), shape=(c.get_row_count(), c.get_col_count()))
+    32                                         
+    33                                         
+    34     62.2 MiB      0.0 MiB           1       G = nx.from_scipy_sparse_array(mat, create_using=nx.DiGraph)
+    35     62.2 MiB      0.0 MiB           1       print(G)
+    36                                         
+    37                                         
+    38                                             # print(len(x))
+    39                                             # x = np.frombuffer(c.get_row_ptr(), dtype=np.int32, count=4)
+    40                                             # del c
+    41                                         
+    42                                             # print(x)
+    43                                         
+    44                                         
+    45     62.2 MiB      0.0 MiB           1       d=CSC_double(c)
+    46                                             #d=CSC_double()
+    47     62.2 MiB      0.0 MiB           1       print(type(c))
+    48                                             # print(type(d))
+    49     62.2 MiB      0.0 MiB           1       print(type(d))
+    50     62.2 MiB      0.0 MiB           1       d.column_reduce()
+    51                                             #d(c)
+    52                                             #CSC_double(c)
+    53                                             #d(c)
+    54                                             #d=CSC_double(c)
+    55                                             #d=CSC_double(c<int32_t,double,int32_t>)
+    56                                         
+    57                                         
+    58                                             #d=CSC(c)
+
+
+Filename: /nfs/nfs2/home/mdshoque/projects/splib/SpLib/tests/Archive/pybind11_binding/test.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+     9     61.9 MiB     61.9 MiB           1   @profile(stream=mem_logs)
+    10                                         def run_test():
+    11     61.9 MiB      0.0 MiB           1       c=COO_double()
+    12     61.9 MiB      0.0 MiB           1       c.PrintInfo()
+    13     61.9 MiB      0.0 MiB           1       print((c.get_row_count(), c.get_col_count()))
+    14                                         
+    15     61.9 MiB      0.0 MiB           1       c.GenER(10,10,True,1)
+    16     61.9 MiB      0.0 MiB           1       c.PrintInfo()
+    17                                         
+    18                                             # x = np.asarray(memoryview(c.get_row_ptr()))
+    19                                             # x = np.ctypeslib.as_array(c.get_row_ptr())
+    20                                             # x = np.array(c.get_row_ptr(), copy=False)
+    21                                         
+    22                                         
+    23     61.9 MiB      0.0 MiB           1       m1_row = np.array(c.get_row_ptr(), copy=True)
+    24     62.1 MiB      0.3 MiB           1       m1_col = np.array(c.get_col_ptr(), copy=True)
+    25     62.1 MiB      0.0 MiB           1       m1_val = np.array(c.get_val_ptr(), copy=True)
+    26                                             # print(m1_row)
+    27                                             # print(m1_col)
+    28                                             # print(m1_val)
+    29                                         
+    30                                             # print((c.get_row_count(), c.get_col_count()))
+    31     62.1 MiB      0.0 MiB           1       mat = coo_matrix((m1_val, (m1_row, m1_col)), shape=(c.get_row_count(), c.get_col_count()))
+    32                                         
+    33                                         
+    34     66.8 MiB      4.7 MiB           1       G = nx.from_scipy_sparse_array(mat, create_using=nx.DiGraph)
+    35     66.8 MiB      0.0 MiB           1       print(G)
+    36                                         
+    37                                         
+    38                                             # print(len(x))
+    39                                             # x = np.frombuffer(c.get_row_ptr(), dtype=np.int32, count=4)
+    40                                             # del c
+    41                                         
+    42                                             # print(x)
+    43                                         
+    44                                         
+    45     66.9 MiB      0.0 MiB           1       d=CSC_double(c)
+    46                                             #d=CSC_double()
+    47     66.9 MiB      0.0 MiB           1       print(type(c))
+    48                                             # print(type(d))
+    49     66.9 MiB      0.0 MiB           1       print(type(d))
+    50     66.9 MiB      0.0 MiB           1       d.column_reduce()
+    51                                             #d(c)
+    52                                             #CSC_double(c)
+    53                                             #d(c)
+    54                                             #d=CSC_double(c)
+    55                                             #d=CSC_double(c<int32_t,double,int32_t>)
+    56                                         
+    57                                         
+    58                                             #d=CSC(c)
+
+
+Filename: /nfs/nfs2/home/mdshoque/projects/splib/SpLib/tests/Archive/pybind11_binding/test.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+     9     62.3 MiB     62.3 MiB           1   @profile(stream=mem_logs)
+    10                                         def run_test():
+    11     62.3 MiB      0.0 MiB           1       c=COO_double()
+    12     62.3 MiB      0.0 MiB           1       c.PrintInfo()
+    13     62.3 MiB      0.0 MiB           1       print((c.get_row_count(), c.get_col_count()))
+    14                                         
+    15     62.3 MiB      0.0 MiB           1       c.GenER(10,10,True,1)
+    16     62.3 MiB      0.0 MiB           1       c.PrintInfo()
+    17                                         
+    18                                             # x = np.asarray(memoryview(c.get_row_ptr()))
+    19                                             # x = np.ctypeslib.as_array(c.get_row_ptr())
+    20                                             # x = np.array(c.get_row_ptr(), copy=False)
+    21                                         
+    22                                         
+    23     62.3 MiB      0.0 MiB           1       m1_row = np.array(c.get_row_ptr(), copy=False)
+    24     62.3 MiB      0.0 MiB           1       m1_col = np.array(c.get_col_ptr(), copy=False)
+    25     62.3 MiB      0.0 MiB           1       m1_val = np.array(c.get_val_ptr(), copy=False)
+    26                                             # print(m1_row)
+    27                                             # print(m1_col)
+    28                                             # print(m1_val)
+    29                                         
+    30                                             # print((c.get_row_count(), c.get_col_count()))
+    31     62.6 MiB      0.3 MiB           1       mat = coo_matrix((m1_val, (m1_row, m1_col)), shape=(c.get_row_count(), c.get_col_count()))
+    32                                         
+    33                                         
+    34     67.0 MiB      4.4 MiB           1       G = nx.from_scipy_sparse_array(mat, create_using=nx.DiGraph)
+    35     67.0 MiB      0.0 MiB           1       print(G)
+    36                                         
+    37                                         
+    38                                             # print(len(x))
+    39                                             # x = np.frombuffer(c.get_row_ptr(), dtype=np.int32, count=4)
+    40                                             # del c
+    41                                         
+    42                                             # print(x)
+    43                                         
+    44                                         
+    45     67.3 MiB      0.3 MiB           1       d=CSC_double(c)
+    46                                             #d=CSC_double()
+    47     67.3 MiB      0.0 MiB           1       print(type(c))
+    48                                             # print(type(d))
+    49     67.3 MiB      0.0 MiB           1       print(type(d))
+    50     67.3 MiB      0.0 MiB           1       d.column_reduce()
+    51                                             #d(c)
+    52                                             #CSC_double(c)
+    53                                             #d(c)
+    54                                             #d=CSC_double(c)
+    55                                             #d=CSC_double(c<int32_t,double,int32_t>)
+    56                                         
+    57                                         
+    58                                             #d=CSC(c)
+
+
