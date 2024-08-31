@@ -10,7 +10,14 @@ import networkx as nx
 def splib_coo_to_scipy_sparse_array(splib_coo, copy=False):
     m1_row = np.array(splib_coo.get_row_ptr(), copy=copy)
     m1_col = np.array(splib_coo.get_col_ptr(), copy=copy)
-    m1_val = np.array(splib_coo.get_val_ptr(), copy=copy)
+    try:
+        m1_val = np.array(splib_coo.get_val_ptr(), copy=copy)
+    except ValueError as e:
+        if str(e) == "PyCapsule_New called with null pointer":
+            m1_val = np.array([1 for _ in m1_row])
+        else:
+            print("Unknown error processing FastGraph value vector. ")
+            print(f"Error message: {str(e)}")
     
     mat = coo_matrix((m1_val, (m1_row, m1_col)), shape=(splib_coo.get_row_count(), splib_coo.get_col_count()))
     

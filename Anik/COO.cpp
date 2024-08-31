@@ -270,6 +270,7 @@ void COO<RIT, CIT, VT>::GenER(int scale, int d, bool isWeighted, int64_t kRandSe
     ncols_ = nrows_;
     nnz_ = nrows_  * d;
    
+    
     //TODO: think about a block size based on the number of threads
     // blocking is done for random number generators
     // one seed per block
@@ -282,11 +283,15 @@ void COO<RIT, CIT, VT>::GenER(int scale, int d, bool isWeighted, int64_t kRandSe
 
     size_t nthreads;
     size_t block_size;
-#pragma omp parallel
+    
+    #pragma omp parallel
     {
         int tid = omp_get_thread_num();
         if(tid == 0){
+            // std::cout << omp_get_num_threads(); 
             nthreads = omp_get_num_threads();
+            // std::cout << "Num threads: "; 
+            // std::cout << nthreads;
             block_size = nnz_ / nthreads;
         }
     }

@@ -1,5 +1,6 @@
 *.swp
 *.o
+*.out
 exp_scaling
 hash-regular-dynamic
 hash-regular-static
