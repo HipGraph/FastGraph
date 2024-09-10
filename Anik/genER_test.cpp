@@ -1,5 +1,5 @@
-//  randmat_test.cpp
-//
+//  Compile: g++ -fopenmp -o test_c test_c.cpp
+//  Run: ./test_c
 //
 
 #include <stdio.h>
