@@ -117,6 +117,8 @@ public:
 	pvector<T> column_reduce_1();
 
     void column_split(std::vector< CSC<RIT, VT, CPT>* > &vec, int nsplit);
+	
+	void make_stochastic();
 private:
 	size_t nrows_;
 	size_t ncols_;
@@ -128,6 +130,39 @@ private:
 	bool isWeighted_;
 	bool isColSorted_;
 };
+
+
+template <typename RIT, typename VT, typename CPT>
+void CSC<RIT, VT, CPT>:: make_stochastic() {
+		std::cout << "\nHI......";
+		// Step 1: Get the column sums using the existing column_reduce_1 function
+		pvector<VT> column_sums = column_reduce_1<VT>();
+
+		std::cout << "\ncolumn_sums: ";
+		for (auto &x : column_sums) {
+			std::cout << x << " ";
+		}
+
+		// Step 2: Normalize each column by dividing each value by the corresponding column sum
+		for (size_t col = 0; col < ncols_; col++) {
+			VT col_sum = column_sums[col];
+
+			// If the column sum is 0 (dangling node), handle it by setting the column to be uniform (1/nrows)
+			if (col_sum == 0) {
+				VT uniform_value = 1.0 / nrows_; // Assign equal probability to all nodes
+				for (size_t row = colPtr_[col]; row < colPtr_[col + 1]; row++) {
+					nzVals_[row] = uniform_value; // Make the column uniform
+				}
+			} else {
+				// Otherwise, divide each non-zero value in the column by the column sum to normalize it
+				for (size_t row = colPtr_[col]; row < colPtr_[col + 1]; row++) {
+					nzVals_[row] /= col_sum;  // Normalize the value
+				}
+			}
+		}
+	}
+
+
 
 template <typename RIT, typename VT, typename CPT>
 void CSC<RIT, VT, CPT>::ewiseApply(VT scalar)
@@ -179,9 +214,6 @@ void CSC<RIT, VT, CPT>::dimApply(pvector<T> &mul_vector)
 	}
 	
 }
-
-
-
 
 
 
