@@ -27,7 +27,7 @@ def run_test2():
     d = adapter.scipy_sparse_matrix_to_splib_coo(B)
     d.PrintInfo()
     print('ok')
-    e = CSC_double(c)
+    e = CSC_double(c)  # CSR
     e.column_reduce()
 
 
