@@ -18,6 +18,7 @@ def read_mm_file(filename):
     # Add edges from the remaining lines
     for line in lines[1:]:
         row, col, weight = map(float, line.split())
+        # print(row, col, weight)
         G.add_edge(int(row), int(col), weight=weight)
     
     return G
@@ -28,10 +29,15 @@ def compute_pagerank(filename):
     n = G.number_of_nodes()
     
     # Initialize the nstart vector to 1/n for each node
-    nstart = {node: 1.0/n for node in G.nodes}
+    # nstart = {node: 1.0/n for node in G.nodes}
 
     # Compute PageRank using NetworkX
-    pagerank = nx.pagerank(G, alpha=0.85, max_iter=100, tol=1e-6, nstart=nstart)
+
+    W = nx.stochastic_graph(G, weight='weight')
+    print("\nstochastic_graph: ")
+    for edge in W.edges(data=True):
+        print(edge)
+    pagerank = nx.pagerank(G, alpha=0.85, max_iter=100, tol=1e-6) #, nstart=nstart)
     
     # Print the resultss
     # print("PageRank Results:")

@@ -19,12 +19,13 @@ std::vector<double> PageRank(CSC<uint32_t, double>& graph, int n) {
     // Calculate outdegree for each node (how many outgoing links each node has)
     for (size_t col = 0; col < n; col++) {
         outdegree[col] = graph.get_colPtr(col + 1) - graph.get_colPtr(col);
+        // std::cout << outdegree[col] << "\n";
     }
 
     // Iteratively update ranks until convergence or maximum iterations
     for (int iter = 0; iter < MAX_ITER; iter++) {
         // Reset new_rank for each iteration
-        std::fill(new_rank.begin(), new_rank.end(), 0.0);
+        std::fill(new_rank.begin(), new_rank.end(), 1.0/n);
 
         // Calculate new rank for each node based on incoming links
         for (size_t col = 0; col < n; col++) {
@@ -74,15 +75,27 @@ int main(int argc, char* argv[]) {
 
     coo.PrintInfo();  // Print COO matrix information
 
+    coo.make_stochastic();  // Convert to stochastic form
+
+
     // Convert the COO matrix to CSC format
     CSC<uint32_t, double> cscMatrix(coo);
 
     // Print the CSC matrix information
-    cscMatrix.PrintInfo();
+    // cscMatrix.PrintInfo();
+    // std::cout << "\nBefore stochastic: \n";
+    cscMatrix.print_all();
 
     // Get the number of nodes in the graph {always it will be a square matrix}
     int n = coo.nrows();
 
+    // Make the CSC matrix stochastic
+    // cscMatrix.make_stochastic();  // another dumb try!
+
+    // Print the CSC matrix information
+    // std::cout << "\nAfter stochastic: \n";
+    // cscMatrix.print_all();
+    
     // Calculate PageRank
     std::vector<double> ranks = PageRank(cscMatrix, n);
 
