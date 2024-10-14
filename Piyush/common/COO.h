@@ -111,6 +111,9 @@ public:
     
     void print_all(); // added by abhishek
 
+     // Declare the make_stochastic method
+    void make_stochastic();
+
     
 private:
     size_t nrows_;
