@@ -6,6 +6,7 @@
 
 #include "COO.cpp"
 #include "CSC.cpp"
+#include "CSR.cpp"
 
 namespace py = pybind11;
 
@@ -77,10 +78,22 @@ void define_csc(py::module &m, std::string classname)
 		
 }
 
+template <typename RIT, typename CIT, typename VT=double,typename CPT=size_t>
+void define_csr(py::module &m, std::string classname)
+{
+	py::class_<CSR<RIT,VT,CPT>>(m, classname.c_str())
+		.def(py::init<COO<RIT,CIT,VT>&>())
+		.def("PrintInfo",&CSR<RIT,VT,CPT>::PrintInfo)
+		.def(py::init<>());
+		
+}
+
+
 PYBIND11_MODULE(COO, m) {
 	define_coo<int32_t,int32_t,int32_t>(m, "COO_int");
 	define_coo<int32_t, int32_t, double>(m, "COO_double");
 	define_csc<int32_t, int32_t, double>(m, "CSC_double");
+	define_csr<int32_t, int32_t, double>(m, "CSR_double");
 }
 
 // PYBIND11_MODULE(CSC, m) {
