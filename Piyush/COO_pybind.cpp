@@ -1,14 +1,27 @@
+
 #include <string>
 #include <pybind11/pybind11.h>
 #include <pybind11/functional.h>
 #include <pybind11/numpy.h>
+
+#include <pybind11/stl.h>
+
 #include <cstdlib>
 
-#include "COO.cpp"
-#include "CSC.cpp"
-#include "CSR.cpp"
+#include "common/COO.h"
+#include "common/CSC.h"
+#include "common/CSR.h"
+
+
+// #include "COO.cpp"
+// #include "CSC.cpp"
+// #include "CSR.cpp"
+#include "PageRank/page_rank.cpp"
 
 namespace py = pybind11;
+
+
+
 
 template <typename RIT, typename CIT, typename VT=double>
 void define_coo(py::module &m, std::string classname)
@@ -62,7 +75,9 @@ void define_coo(py::module &m, std::string classname)
 			size_t sz = buf.size;
 			M.update_val_pvector(ptr, sz, transfer_ownership);
 		})
-		.def("PrintInfo",&COO<RIT,CIT,VT>::PrintInfo);
+		.def("PrintInfo",&COO<RIT,CIT,VT>::PrintInfo)
+		.def("make_stochastic",&COO<RIT, CIT, VT>::make_stochastic)
+		.def("print_all", &COO<RIT, CIT, VT>::print_all);
 	
 	// py::class_<CSC<RIT,VT,CPT>>(m, classname.c_str())
 	// 	.def(py::init<COO<RIT,CIT,VT>());
@@ -74,7 +89,8 @@ void define_csc(py::module &m, std::string classname)
 {
 	py::class_<CSC<RIT,VT,CPT>>(m, classname.c_str())
 		.def(py::init<COO<RIT,CIT,VT>&>())
-		.def("column_reduce",&CSC<RIT,VT,CPT>::column_reduce);
+		.def("column_reduce",&CSC<RIT,VT,CPT>::column_reduce)
+		.def("print_all", &CSC<RIT, VT, CPT>::print_all);
 		
 }
 
@@ -90,10 +106,17 @@ void define_csr(py::module &m, std::string classname)
 
 
 PYBIND11_MODULE(COO, m) {
-	define_coo<int32_t,int32_t,int32_t>(m, "COO_int");
-	define_coo<int32_t, int32_t, double>(m, "COO_double");
-	define_csc<int32_t, int32_t, double>(m, "CSC_double");
-	define_csr<int32_t, int32_t, double>(m, "CSR_double");
+
+	define_coo<int32_t,int32_t, int32_t>(m, "COO_int");
+	// define_coo<int32_t, int32_t, double>(m, "COO_double");
+	// Updated line
+	define_coo<uint32_t, uint32_t, double>(m, "COO_double");
+
+	// define_csc<int32_t, int32_t, double>(m, "CSC_double");
+	define_csc<uint32_t, uint32_t, double, size_t>(m, "CSC_double");
+	define_csr<uint32_t, uint32_t, double>(m, "CSR_double");
+	// Bind the PageRank function
+    m.def("page_rank", &PageRank, py::arg("graph"), py::arg("n"), "Compute PageRank of a graph represented in CSC format");
 }
 
 // PYBIND11_MODULE(CSC, m) {

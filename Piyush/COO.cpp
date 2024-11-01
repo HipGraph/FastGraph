@@ -109,7 +109,7 @@ public:
     void nz_vals_pvector(pvector<VT>* value_pointer) {nzVals_ = std::move((* value_pointer));}
     
     void update_row_pvector(RIT * ptr, size_t sz, bool owner_=false) { nrows_ = sz; nzRows_.update_pvector(ptr, sz, owner_);}
-    void update_col_pvector(RIT * ptr, size_t sz, bool owner_=false) { ncols_ = sz; nzCols_.update_pvector(ptr, sz, owner_);}
+    void update_col_pvector(CIT * ptr, size_t sz, bool owner_=false) { ncols_ = sz; nzCols_.update_pvector(ptr, sz, owner_);}
     void update_val_pvector(VT * ptr, size_t sz, bool owner_=false) { nnz_ = sz; nzVals_.update_pvector(ptr, sz, owner_);}
 
     void print_all(); // added by abhishek

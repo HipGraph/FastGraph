@@ -313,73 +313,73 @@ CSR<RIT, VT, CPT>::CSR(COO<RIT, CIT, VT> & cooMat)
 //         }
 //     }
 
-template <typename RIT, typename VT, typename CPT>
-template <typename AddOp>
-void CSR<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
-{
-    pvector<RIT> sqNnzPerRow(nrows_);
-    #pragma omp parallel
-    {
-        pvector<std::pair<RIT, VT>> tosort;
-        #pragma omp for
-        for (size_t i = 0; i < nrows_; i++)
-        {
-            size_t nnzRow = colPtr_[i + 1] - colPtr_[i];
-            sqNnzPerRow[i] = 0;
-            if (nnzRow > 0)
-            {
-                if (tosort.size() < nnzRow)
-                    tosort.resize(nnzRow);
+// template <typename RIT, typename VT, typename CPT>
+// template <typename AddOp>
+// void CSR<RIT, VT, CPT>::MergeDuplicateSort(AddOp binop)
+// {
+//     pvector<RIT> sqNnzPerRow(nrows_);
+//     #pragma omp parallel
+//     {
+//         pvector<std::pair<RIT, VT>> tosort;
+//         #pragma omp for
+//         for (size_t i = 0; i < nrows_; i++)
+//         {
+//             size_t nnzRow = colPtr_[i + 1] - colPtr_[i];
+//             sqNnzPerRow[i] = 0;
+//             if (nnzRow > 0)
+//             {
+//                 if (tosort.size() < nnzRow)
+//                     tosort.resize(nnzRow);
                 
-                for (size_t j = 0, k = colPtr_[i]; j < nnzRow; ++j, ++k)
-                {
-                    tosort[j] = std::make_pair(rowIds_[k], nzVals_[k]);
-                }
+//                 for (size_t j = 0, k = colPtr_[i]; j < nnzRow; ++j, ++k)
+//                 {
+//                     tosort[j] = std::make_pair(rowIds_[k], nzVals_[k]);
+//                 }
 
-                std::sort(tosort.begin(), tosort.begin() + nnzRow);
+//                 std::sort(tosort.begin(), tosort.begin() + nnzRow);
 
-                size_t k = colPtr_[i];
-                rowIds_[k] = tosort[0].first;
-                nzVals_[k] = tosort[0].second;
+//                 size_t k = colPtr_[i];
+//                 rowIds_[k] = tosort[0].first;
+//                 nzVals_[k] = tosort[0].second;
 
-                for (size_t j = 1; j < nnzRow; ++j)
-                {
-                    if (tosort[j].first != rowIds_[k])
-                    {
-                        rowIds_[++k] = tosort[j].first;
-                        nzVals_[k] = tosort[j].second;
-                    }
-                    else
-                    {
-                        nzVals_[k] = binop(tosort[j].second, nzVals_[k]);
-                    }
-                }
-                sqNnzPerRow[i] = k - colPtr_[i] + 1;
-            }
-        }
-    }
+//                 for (size_t j = 1; j < nnzRow; ++j)
+//                 {
+//                     if (tosort[j].first != rowIds_[k])
+//                     {
+//                         rowIds_[++k] = tosort[j].first;
+//                         nzVals_[k] = tosort[j].second;
+//                     }
+//                     else
+//                     {
+//                         nzVals_[k] = binop(tosort[j].second, nzVals_[k]);
+//                     }
+//                 }
+//                 sqNnzPerRow[i] = k - colPtr_[i] + 1;
+//             }
+//         }
+//     }
 
-    // Now squeeze the result into new vectors
-    pvector<CPT> sqColPtr;
-    ParallelPrefixSum(sqNnzPerRow, sqColPtr);
-    nnz_ = sqColPtr[ncols_];
-    pvector<RIT> sqRowIds(nnz_);
-    pvector<VT> sqNzVals(nnz_);
+//     // Now squeeze the result into new vectors
+//     pvector<CPT> sqColPtr;
+//     ParallelPrefixSum(sqNnzPerRow, sqColPtr);
+//     nnz_ = sqColPtr[ncols_];
+//     pvector<RIT> sqRowIds(nnz_);
+//     pvector<VT> sqNzVals(nnz_);
 
-    #pragma omp parallel for
-    for (size_t i = 0; i < nrows_; i++)
-    {
-        size_t srcStart = colPtr_[i];
-        size_t srcEnd = colPtr_[i] + sqNnzPerRow[i];
-        size_t destStart = sqColPtr[i];
-        std::copy(rowIds_.begin() + srcStart, rowIds_.begin() + srcEnd, sqRowIds.begin() + destStart);
-        std::copy(nzVals_.begin() + srcStart, nzVals_.begin() + srcEnd, sqNzVals.begin() + destStart);
-    }
+//     #pragma omp parallel for
+//     for (size_t i = 0; i < nrows_; i++)
+//     {
+//         size_t srcStart = colPtr_[i];
+//         size_t srcEnd = colPtr_[i] + sqNnzPerRow[i];
+//         size_t destStart = sqColPtr[i];
+//         std::copy(rowIds_.begin() + srcStart, rowIds_.begin() + srcEnd, sqRowIds.begin() + destStart);
+//         std::copy(nzVals_.begin() + srcStart, nzVals_.begin() + srcEnd, sqNzVals.begin() + destStart);
+//     }
 
-    colPtr_.swap(sqColPtr);
-    rowIds_.swap(sqRowIds);
-    nzVals_.swap(sqNzVals);
-}
+//     colPtr_.swap(sqColPtr);
+//     rowIds_.swap(sqRowIds);
+//     nzVals_.swap(sqNzVals);
+// }
 
 
     

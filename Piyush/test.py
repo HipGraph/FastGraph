@@ -3,7 +3,7 @@ import numpy as np
 import scipy.io
 from scipy.sparse import coo_matrix
 import networkx as nx
-import adapter 
+import adapter
 
 # export OMP_NUM_THREADS=4
 def run_test1():
@@ -15,6 +15,7 @@ def run_test1():
     c = adapter.scipy_sparse_matrix_to_splib_coo(A)
     # c.GenER(4,4, False, 1)
     c.PrintInfo()
+    c.print_all()
     
     B = adapter.splib_coo_to_scipy_sparse_array(c)
     print(B)
@@ -43,11 +44,14 @@ def run_test4():
     print("\nType: ", type(c))
     e = CSR_double(c)  # CSR
     e.PrintInfo()
+    result = e.page_rank()
+    print(result)
     # e.column_reduce()
 
 def run_test5():
+    # Piyush
     # Step 1: Read the Matrix Market file (present in current directgory) into a scipy sparse COO matrix
-    mm_file = 'input_2.mtx'
+    mm_file = 'input_3.mtx'
     print("Step 1: Reading Matrix Market file...")
     try:
         A = scipy.io.mmread(mm_file).tocoo()
@@ -62,34 +66,46 @@ def run_test5():
     print(f"NetworkX graph has {G.number_of_nodes()} nodes and {G.number_of_edges()} edges.")
 
     # Step 3: Convert the NetworkX graph back to a scipy COO sparse matrix
-    # This ensures that any internal ordering or processing by NetworkX is captured
     print("\nStep 3: Converting NetworkX graph back to scipy sparse COO matrix...")
 
     scipy_coo = nx.to_scipy_sparse_matrix(G, format='coo')
     print(f"Converted scipy COO matrix shape: {scipy_coo.shape}, number of non-zeros: {scipy_coo.nnz}")
 
-    # Here end-user can do other operations with NetworkX graph
+    # print("\nScipy_coo PRINTING .....")
+    print("\nScipy_coo: \n", scipy_coo)
 
     # Step 4: Next, convert the scipy COO matrix to FastGraph's COO using adapter.py
     print("\nStep 4: Converting scipy COO matrix to FastGraph COO...")
     fastgraph_coo = adapter.scipy_sparse_matrix_to_splib_coo(scipy_coo)
     print("Conversion to FastGraph COO completed.")
+ 
+    fastgraph_coo.PrintInfo()
 
     # Step 5: Print some information about the FastGraph COO for verification
-    print("\nStep 5: FastGraph COO information (first 10 entries):")
-    row_ptr = fastgraph_coo.get_row_ptr()
-    col_ptr = fastgraph_coo.get_col_ptr()
-    val_ptr = fastgraph_coo.get_val_ptr()
-    print(f"Rows (first 10): {row_ptr[:10]}")
-    print(f"Columns (first 10): {col_ptr[:10]}")
-    print(f"Values (first 10): {val_ptr[:10]}")
-
+    print("\nStep 5: FastGraph COO information:")
+    fastgraph_coo.print_all()
+    
+    # row_ptr = fastgraph_coo.get_row_ptr()
+    # col_ptr = fastgraph_coo.get_col_ptr()
+    # val_ptr = fastgraph_coo.get_val_ptr()
 
     # Step 6: Converting to CSR and printing CSR info
     print("\nStep: Converting FastGraph COO to CSR and printing CSR info...")
-    # print("\nType: ", type(fastgraph_coo))
-    csr = CSR_double(fastgraph_coo)
-    csr.PrintInfo()
+    print("\nType: ", type(fastgraph_coo))
+    # csr = CSR_double(fastgraph_coo)
+    # print("\nCSR INFO PRINTING .....")
+    # csr.PrintInfo()
+
+    fastgraph_coo.make_stochastic()
+    csc = CSC_double(fastgraph_coo)
+    csc.print_all()
+    # Step7: Getting PageRank done! (just we have to pass n value manually - be carefull about it)
+    ranks = page_rank(csc, 10)
+    print(type(ranks))
+    print(ranks)
+
+
+
 
 # @profile(stream=mem_logs)
 def run_test3():

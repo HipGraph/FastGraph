@@ -114,6 +114,14 @@ public:
      // Declare the make_stochastic method
     void make_stochastic();
 
+    pvector<RIT>& get_row_vector() {return nzRows_;}
+    pvector<CIT>& get_col_vector() {return nzCols_;}
+    pvector<VT>& get_val_vector() {return nzVals_;}
+
+    void update_row_pvector(RIT * ptr, size_t sz, bool owner_=false) { nrows_ = sz; nzRows_.update_pvector(ptr, sz, owner_);}
+    void update_col_pvector(CIT * ptr, size_t sz, bool owner_=false) { ncols_ = sz; nzCols_.update_pvector(ptr, sz, owner_);}
+    void update_val_pvector(VT * ptr, size_t sz, bool owner_=false) { nnz_ = sz; nzVals_.update_pvector(ptr, sz, owner_);}
+
     
 private:
     size_t nrows_;
@@ -125,6 +133,26 @@ private:
     bool isWeighted_;
     int sortType_;
 };
+
+template <typename RIT, typename CIT, typename VT>
+void COO<RIT, CIT, VT>::make_stochastic() {
+    // Step 1: Compute row sums (out-degree for each row)
+    std::unordered_map<RIT, VT> row_sums;
+
+    for (size_t i = 0; i < nnz_; i++) {
+        row_sums[nzRows_[i]] += nzVals_[i];
+    }
+
+    // Step 2: Normalize the values in each row by dividing by the row sum
+    for (size_t i = 0; i < nnz_; i++) {
+        if (row_sums[nzRows_[i]] > 0) {
+            nzVals_[i] /= row_sums[nzRows_[i]];
+        }
+    }
+
+    std::cout << "Matrix has been converted to stochastic form." << std::endl;
+}
+
 
 template <typename RIT, typename CIT, typename VT>
 void COO<RIT, CIT, VT>::PrintInfo()

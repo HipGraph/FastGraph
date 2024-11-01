@@ -1,6 +1,7 @@
 import networkx as nx
 import numpy as np
 import sys
+import time
 
 # Function to read the MM file and create a graph
 def read_mm_file(filename):
@@ -37,7 +38,11 @@ def compute_pagerank(filename):
     print("\nstochastic_graph: ")
     for edge in W.edges(data=True):
         print(edge)
-    pagerank = nx.pagerank(G, alpha=0.85, max_iter=100, tol=1e-6) #, nstart=nstart)
+    
+    start_time = time.time()
+    pagerank = nx.pagerank(G, alpha=0.85, max_iter=100, tol=1e-9, weight='weight') #, nstart=nstart)
+    end_time = time.time()
+    execution_time = end_time - start_time
     
     # Print the resultss
     # print("PageRank Results:")
@@ -50,8 +55,13 @@ def compute_pagerank(filename):
     print("Sorted PageRank (Python NetworkX):")
     for node, rank in sorted_ranks:
         print(f"Node {node}: {rank}")
+    
+    # Output the elapsed time in seconds
+    print(f"Execution time: {execution_time:.6f} seconds")
 
 if __name__ == "__main__": 
     filename = sys.argv[1]
+    import os
+    print(os.getcwd())
     # filename = 'utm2a.mtx' 
     compute_pagerank(filename)

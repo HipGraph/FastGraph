@@ -31,11 +31,15 @@ def scipy_sparse_matrix_to_splib_coo(A):
     # (r, c) = A.shape
     # nnz = A.nnz
 
-    row = A.row
-    col = A.col
-    val = A.data
+    row = A.row.astype(np.uint32)
+    col = A.col.astype(np.uint32)
+    val = A.data.astype(np.float64)
+
+    print("\nIn scipy_sparse_matrix_to_splibZ_coo: \n", val, "\n",  row, "\n", col)
 
     ret = COO_double()
+    ret.print_all()
+    print("\nend ...")
     ret.update_row_pvector(row, False)   # transfer ownership = False
     ret.update_col_pvector(col, False)
     ret.update_val_pvector(val, False)
